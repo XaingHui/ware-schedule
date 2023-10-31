@@ -30,14 +30,17 @@ class WarehouseEnvironment:
         self.width = width
         self.height = height
         self.number = number
+        self.segment_widths = []  # 存储每个物品的分段宽度
+        self.y_axis_ticks = []  # 用于存储刻度值
         self.grid = np.zeros((height, width), dtype=int)
         self.agent_position = (0, 0)
         self.target_positions = [(width - 1, i) for i in range(height)]
         self.interference_blocks = []
         self.items = {}
         self.colors = list(mcolors.TABLEAU_COLORS)
-        self.road = {'x': width + 20, 'width': 20, 'color': 'lightgray'}  # 道路属性
+        self.road = {'x': width, 'width': 20, 'color': 'lightgray'}  # 道路属性
         # Initialize the initial state
+        self.item_cache = []  # 创建一个缓存队列来存储待添加的物品
         self.initial_state = self.get_state()
 
     def get_state(self):
@@ -92,7 +95,12 @@ class WarehouseEnvironment:
     添加物品到 环境当中
     """
 
-    def add_item(self,item_id, length, width, start_time, processing_time, exit_time):
+    def add_item(self, item_id, length, width, start_time, processing_time, exit_time):
+        if len(self.items) >= self.number:
+            # 如果空地上的物品数量已经达到限制，你可以采取适当的操作，例如引发异常
+            raise ValueError("空地上的物品数量已经达到限制")
+            # 如果空地上的物品数量已经达到限制，将物品添加到缓存队列等待
+            # self.item_cache.append((item_id, length, width, start_time, processing_time, exit_time, item_color))
         if len(self.items) == 0:
             x = 0
             y = 0
@@ -111,20 +119,22 @@ class WarehouseEnvironment:
                 x = 0
                 y += prev_length
 
+        # 存储分段宽度
+        self.segment_widths.append(width)
         if (x, y) not in self.items:
             item_color = self.colors[len(self.items) % len(self.colors)]
-            item = Item(item_id, length, width, start_time, processing_time, exit_time,item_color)
+            item = Item(item_id, length, width, start_time, processing_time, exit_time, item_color)
             size = length * width
             item.x = x
             item.y = y
-            item.size = length * width
+            item.size = length * width / 10
             # item.color = color
             self.items[(x, y)] = item
-
+            # self.grid[y, x] = item.x, item.y
             # 将物品信息添加到环境网格中
             for i in range(size):
                 for j in range(size):
-                    self.grid[y , x ] = len(self.items)
+                    self.grid[y, x] = len(self.items)
 
             return item
 
@@ -172,10 +182,40 @@ class WarehouseEnvironment:
                 # 有干涉方块，选择合适的方法
                 self.handle_interference(interference_items, method)
 
+    def calculate_y_axis_ticks(self):
+        # 计算y轴的刻度值
+        remaining_height = self.height
+        for segment_width in self.segment_widths:
+            # 计算每个刻度值，确保它们的总和等于height
+            segment_height = (segment_width / sum(self.segment_widths)) * self.height
+            self.y_axis_ticks.append(segment_height)
+            remaining_height -= segment_height
+
+        # 添加剩余的刻度值，确保总和等于height
+        self.y_axis_ticks.append(remaining_height)
+
     def render(self):
+
         plt.figure(figsize=(5, 5))
-        plt.imshow(np.ones((self.height, self.width)), cmap='binary', interpolation='none', origin='upper')
-        # plt.axis('off')
+        # 创建 x 轴刻度标签
+        x_ticks = [0, self.road['x'], self.width]
+
+        # 绘制刻度标签
+        plt.xticks(x_ticks, fontsize=8)
+        plt.imshow(np.ones((self.height, self.width + 20)), cmap='binary', interpolation='none', origin='upper')
+        unique_segment_widths = list(set(self.segment_widths))
+
+        # 创建一个列表来存储y轴刻度的位置
+        y_positions = []
+        current_y = 0  # 初始化y坐标
+        for segment_width in unique_segment_widths:
+            y_positions.append(current_y + segment_width / 2)
+            current_y += segment_width
+
+        # 倒序unique_segment_widths
+        unique_segment_widths = unique_segment_widths[::-1]
+        # 设置y轴刻度标签的位置和标签
+        plt.yticks(y_positions, unique_segment_widths, fontsize=8)
 
         for (x, y), item in self.items.items():
             rect = plt.Rectangle((x, y), item.size, item.size, color=item.color, alpha=0.5)
