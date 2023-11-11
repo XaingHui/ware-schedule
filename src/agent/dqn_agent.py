@@ -1,6 +1,5 @@
-import time
-
 import numpy as np
+import tensorflow
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
@@ -21,6 +20,7 @@ class DQNAgent:
         self.epsilon_min = 0.01
         self.learning_rate = 0.001
         self.model = self.build_model()
+        tensorflow.keras.utils.disable_interactive_logging()
 
     def build_model(self):
         model = Sequential()
@@ -30,11 +30,28 @@ class DQNAgent:
         model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
         return model
 
-    def choose_action(self, state):
-        if np.random.rand() <= self.epsilon:
+    def choose_action(self, state, agent_position, target_position, count):
+
+        if np.random.rand() <= self.epsilon and count > 0:
             return np.random.choice(self.action_size)
-        q_values = self.model.predict(state)
-        return np.argmax(q_values[0])
+        # 计算机器人当前位置和目标位置之间的水平和垂直距离
+        distance_x = target_position[0] - agent_position[0]
+        distance_y = target_position[1] - agent_position[1]
+        # 获取当前Q值
+        # 根据距离选择行动
+        if abs(distance_x) > abs(distance_y):
+            # 在水平方向上的距离较大，选择左移或右移
+            if distance_x > 0:
+
+                return 3  # 右移
+            else:
+                return 2  # 左移
+        else:
+            # 在垂直方向上的距离较大，选择上移或下移
+            if distance_y > 0:
+                return 1  # 下移
+            else:
+                return 0  # 上移
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -56,53 +73,55 @@ class DQNAgent:
 
 def main():
     env = WarehouseEnvironment(width=75, height=153, number=50)
-
+    # 示例用法：添加物品并显示环境
+    env.check_item('B001', 0, 114, 11, 8, '2017/9/1', 13, '2017/9/22')
+    env.check_item('B003', 8, 114, 11, 8, '2017/9/1', 13, '2017/9/22')
+    env.check_item('B002', 0, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
+    env.check_item('B004', 11, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
+    env.check_item('B005', 22, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
+    env.check_item('B006', 33, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
+    env.check_item('B007', 44, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
+    env.check_item('B008', 55, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
+    # env.move_to_target_position(env.get_item_by_id('B001'), 74)
+    env.render()
     state_size = len(env.get_state())
-    action_size = 3  # 代表上移、下移和不执行动作
+    action_size = 4  # 代表上移、下移和不执行动作
     agent = DQNAgent(state_size, action_size)
 
     episodes = 1000
 
     for episode in range(episodes):
-        state = env.get_state()
-        print(env.step(1))
+        state = env.get_state()  # Get the initial state
+        agent_position = np.array(list(state['agent_position']))
+        target_position = np.array(list(state['target_positions']))
+        # item_positions = np.array(list(state['item_positions']))
         print(env.current_time)
-        time.sleep(24)
-        # 从字典中获取数据
-        tuple_data = np.array(state['agent_position'])
-        list_data_1 = np.array(state['target_positions'])
-        list_data_2 = np.array(state['item_positions'])
-        nested_list_data = np.array(state['interference_positions'])
-        print(env.step(1))
-        print(env.current_time)
-        print(tuple_data)
-        print(list_data_1)
-        print(list_data_2)
-        print(nested_list_data)
-        # 合并数据成一个多维数组
-        # Convert positions to NumPy arrays
-        agent_position = np.array(state['agent_position'])
-        target_positions = np.array(state['target_positions'])
-        item_positions = np.array(state['item_positions'])
-        interference_positions = np.array(state['interference_positions'])
-
-        # Concatenate and reshape the data
-        reshaped_state = np.concatenate(
-            [agent_position, target_positions.flatten(), item_positions.flatten(), interference_positions.flatten()])
-        state = np.reshape(reshaped_state, [1, 4])
-
+        # 将这些位置信息合并成一个数组
+        state_array = np.concatenate([agent_position, target_position])
+        #  print(state_array)
+        state = np.reshape(state_array, [-1, state_size])
+        # print(state)
         total_reward = 0
         done = False
-
+        count = 20
         while not done:
-            action = agent.choose_action(state)
+            action = agent.choose_action(state, agent_position, target_position, count)
             next_state, reward, done, _ = env.step(action)
-            next_state = np.reshape(next_state, [1, state_size])
+            print(next_state)
+            agent_position = np.array(list(next_state['agent_position']))
+            target_position = np.array(list(next_state['target_positions']))
+            # item_positions = np.array(list(state['item_positions']))
+
+            # 将这些位置信息合并成一个数组
+            next_state_array = np.concatenate([agent_position, target_position])
+            next_state = np.reshape(next_state_array, [-1, state_size])
+
             agent.remember(state, action, reward, next_state, done)
             agent.train()
+
             total_reward += reward
             state = next_state
-
+            count -= 1
         print(f"Episode: {episode + 1}, Total Reward: {total_reward}")
 
     env.render()

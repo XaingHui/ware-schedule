@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -23,6 +25,18 @@ class Item:
                f"Exit Time: {self.exit_time}"
 
     # 可以根据需要添加其他方法，例如移动物品或检查物品与其他物品的冲突
+    def get_rectangle(self):
+        """
+        获取物品的矩形形状。
+
+        返回：
+        - (left, top, right, bottom) 元组表示矩形的左上角和右下角坐标
+        """
+        left = self.x
+        top = self.y
+        right = self.x + self.width
+        bottom = self.y + self.length
+        return left, top, right, bottom
 
     def move(self, x, y):
         self.x = x
@@ -30,32 +44,28 @@ class Item:
 
 
 class WarehouseEnvironment:
-    def __init__(self, width, height, number, time='2017/9/1', time_speed=24):
-        self.time_counter = 0
+    def __init__(self, width, height, number, time='2017/9/1'):
         self.width = width
         self.height = height
         self.number = number
         self.segment_heights = [20, 19, 18, 16, 15, 13, 13, 11, 10, 9, 8]  # 存储已添加物品的分段高度
-        self.grid = np.zeros((height, width), dtype=int)
+        self.grid = np.zeros((height, width + 20), dtype=object)
         self.agent_position = (0, 0)
-        self.interference_blocks = []
         self.items = {}
         self.colors = list(mcolors.TABLEAU_COLORS)
         self.road = {'x': width, 'width': 20, 'color': 'lightgray'}  # 道路属性
-        self.target_positions = []  # 目标位置列表
+        self.target_position = (0, 0)  # 目标位置列表
         self.current_time = datetime.strptime(time, '%Y/%m/%d')  # 最早出场时间
-        self.initial_state = self.get_state()
+        self.initial_state = {
+            'agent_position': self.agent_position,
+            'target_positions': self.target_position,
+        }
         self.cache_items = []
         self.start_time = datetime.now()
-        self.get_target_positions()
-        self.get_interference_blocks()
+        self.get_target_position()
 
-    def get_target_positions(self):
-        for i in range(self.height):
-            self.target_positions.append((self.width, i))
-
-    def get_interference_blocks(self):
-        pass
+    def get_target_position(self, x=0, y=0):
+        self.target_position = (x, y)
 
     def simulate_time_passage(self):
         # 判断是否过了24秒，如果是，增加一天
@@ -66,40 +76,94 @@ class WarehouseEnvironment:
 
     def get_state(self):
         agent_position = self.agent_position  # 代理机器人的位置
-        target_positions = [list(pos) for pos in self.target_positions]  # 目标位置列表
-        item_positions = [list(pos) for pos in self.items.keys()]  # 物品位置列表
-        interference_positions = [list(pos) for pos in self.interference_blocks]  # 干涉物位置列表
-        # 将所有部分合并为一个 NumPy 数组
+        target_positions = self.target_position  # 目标位置
+
         state = {
             'agent_position': agent_position,
-            'target_positions': target_positions,
-            'item_positions': item_positions,
-            'interference_positions': interference_positions
+            'target_positions': target_positions
         }
 
         return state
 
     def step(self, action):
+        move_x_distance = 1  # 默认移动距离
+        move_y_distance = 1  # 默认移动距离
+        distance_x_to_target = abs(self.agent_position[0] - self.target_position[0])
+        distance_y_to_target = abs(self.agent_position[1] - self.target_position[1])
+        if distance_x_to_target > 50:
+            move_x_distance = int(distance_x_to_target / 2)  # 如果距离大于20，则调整移动距离
+        elif distance_x_to_target > 30 < 50:
+            move_x_distance = int(distance_x_to_target / 2)    # 如果距离大于20，则调整移动距离
+        elif distance_x_to_target > 20 < 30:
+            move_x_distance = int(distance_x_to_target / 2)
+        elif distance_x_to_target > 10 < 20:
+            move_x_distance = int(distance_x_to_target / 2)
+        # 如果距离大于20，则调整移动距离
+        if distance_y_to_target > 50:
+            move_y_distance = int(distance_y_to_target / 2)
+            # 如果距离大于20，则调整移动距离
+        elif distance_y_to_target > 30 < 50:
+            move_y_distance = int(distance_y_to_target / 2)
+            # 如果距离大于20，则调整移动距离
+        elif distance_y_to_target > 20 < 30:
+            move_y_distance = int(distance_y_to_target / 2) # 如果距离大于20，则调整移动距离
+        elif distance_y_to_target > 10 < 20:
+            move_y_distance = int(distance_y_to_target / 2)
+        reward = 0
+        item = Item('B000', 0, 0, 0, 0, '2017/9/1', 0, '2017/9/29', 'red')
+        if self.target_position == (0, 0):
+            # 随机获取一个物品的坐标
+            item = np.random.choice(list(self.items.values()))
+            # 获取目标位置
+            self.get_target_position(item.x, item.y)
+
+        # 记录之前的代理机器人位置
+        prev_agent_position = self.agent_position
+        if self.agent_position[0] > self.target_position[0]:
+            reward -= 100
+        if self.agent_position[1] > self.target_position[1]:
+            reward -= 100
 
         # 执行动作并更新环境状态
-        if action == -1:  # 代理机器人向上移动
-            self.agent_position = (self.agent_position[0], max(0, self.agent_position[1] - 1))
+        if action == 0:  # 代理机器人向上移动
+            self.agent_position = (self.agent_position[0], max(0, self.agent_position[1] - move_y_distance))
+            time.sleep(0.01 * move_y_distance)  # 模拟移动的时间
         elif action == 1:  # 代理机器人向下移动
-            self.agent_position = (self.agent_position[0], min(self.height - 1, self.agent_position[1] + 1))
+            self.agent_position = (self.agent_position[0], min(self.height, self.agent_position[1] + move_y_distance))
+            time.sleep(0.01 * move_y_distance)
+        elif action == 2:  # 代理机器人向左移动
+            self.agent_position = (max(0, self.agent_position[0] - move_x_distance), self.agent_position[1])
+            time.sleep(0.01 * move_x_distance)
+        elif action == 3:  # 代理机器人向右移动
+            self.agent_position = (min(self.width , self.agent_position[0] + move_x_distance), self.agent_position[1])
+            time.sleep(0.01 * move_x_distance)
         else:
-            raise ValueError("Invalid action")
+            print("Invalid action!")
+            reward = -100
+
+        # 计算奖励
+        x_distance_to_target = abs(self.agent_position[0] - self.target_position[0])
+        y_distance_to_target = abs(self.agent_position[1] - self.target_position[1])
+        reward += 300.0 - x_distance_to_target - y_distance_to_target  # 根据距离计算奖励
 
         # 检查是否到达目标位置，根据情况返回奖励
-        if self.agent_position in self.target_positions:
-            reward = 300  # 到达目标位置的奖励
-            done = True  # 任务完成
+        if self.agent_position == self.target_position:
+            reward += 300  # 到达目标位置的奖励
+            if self.target_position[0] >= 75:
+                self.target_position = (0, 0)
+                # 根据目标坐标找到item
+
+                done = True  # 任务完成
+            else:
+                self.target_position = self.width, item.y
+                done = False
         else:
-            reward = 0.0  # 没有到达目标位置的奖励
             done = False
 
         self.simulate_time_passage()
         # 更新状态
         new_state = self.get_state()
+        self.render()  # 更新环境
 
         return new_state, reward, done, {}
 
@@ -107,10 +171,9 @@ class WarehouseEnvironment:
         # Reset the environment to its initial state
         self.agent_position = (0, 0)
         self.items = {}
-        self.interference_blocks = []
         self.grid = np.zeros((self.height, self.width), dtype=int)
-        self.state = self.initial_state  # Reset the state to the initial state
-        return self.state
+        state = self.initial_state  # Reset the state to the initial state
+        return state
 
     """
     添加物品到 环境当中
@@ -124,6 +187,23 @@ class WarehouseEnvironment:
         item = Item(item_id, x, y, length, width, start_time, processing_time, exit_time, item_color)
         return item
 
+    def remove_item(self, item):
+        """
+        从环境中删除指定的物品对象。
+
+        参数：
+        - item: 要删除的物品对象
+
+        返回：
+        - 无返回值
+        """
+        # 从环境中删除物品
+        del self.items[(item.x, item.y)]
+
+        # 从 grid 中清除物品标识
+        self.grid[item.y, item.x] = None
+        self.render()
+
     def check_item(self, item_id, x, y, length, width, start_time, processing_time, exit_time):
         item = self.add_item(item_id, x, y, length, width, start_time, processing_time, exit_time)
         if self.current_time >= item.start_time:
@@ -134,12 +214,91 @@ class WarehouseEnvironment:
                 for j in range(size):
                     self.grid[item.y, item.x] = len(self.items)
 
-    def move_out_to_other_row(self, item, target_row):
-        # 检查是否满足条件搬出目标方块
-        if abs(item.length - target_row) <= 2:
-            # 可以搬出目标方块
+    def check_collision(self, item1, item2):
+        """
+        检查两个矩形是否相交。
+
+        参数：
+        - rectangle1: 第一个矩形的坐标 (left, top, right, bottom)
+        - rectangle2: 第二个矩形的坐标 (left, top, right, bottom)
+
+        返回：
+        - 如果矩形相交，则返回 True，否则返回 False
+        """
+        rectangle1 = item1.get_rectangle()
+        rectangle2 = item2.get_rectangle()
+        if not (rectangle1[2] < rectangle2[0] or  # 左
+                rectangle1[0] > rectangle2[2] or  # 右
+                rectangle1[3] < rectangle2[1] or  # 上
+                rectangle1[1] > rectangle2[3]):
             return True
-        return False
+
+        return item2
+
+    def move_to_target_row(self, item, target_row):
+        # 检查是否满足条件搬出目标方块
+        if item.length <= target_row and abs(item.length - target_row) <= 2:
+            # 可以搬出目标方块
+            tmp_item = item
+            self.remove_item(item)
+            start_time = str(item.start_time).replace('-', '/').strip(' 00:00:00')
+            exit_time = str(item.exit_time).replace('-', '/').strip(' 00:00:00')
+
+            self.check_item(tmp_item.item_id, tmp_item.x, tmp_item.y - target_row, tmp_item.length,
+                            tmp_item.width, start_time,
+                            tmp_item.processing_time, exit_time)
+        self.render()
+
+    def move_to_target_position(self, item, target_position):
+        """
+        将物品移动到目标位置
+
+        参数：
+        - item: 要移动的物品对象
+        - target_position: 目标位置
+
+        返回：
+        - 无返回值
+        """
+        # 检查目标位置是否合法
+        if target_position < 0 or target_position >= \
+                self.width + self.road['width']:
+            raise ValueError("目标位置不合法")
+        # item_target = Item('tmp',)
+        # if self.check_collision() and self.move_out_to_other_row(item, target_position):
+        #     self.move_interference_item(interference_item, target_position)
+
+        tmp_item = item
+        self.remove_item(item)
+        start_time = str(item.start_time).replace('-', '/').strip(' 00:00:00')
+        exit_time = str(item.exit_time).replace('-', '/').strip(' 00:00:00')
+
+        self.check_item(tmp_item.item_id, tmp_item.x, target_position, tmp_item.length,
+                        tmp_item.width, start_time,
+                        tmp_item.processing_time, exit_time)
+
+    def move_interference_item(self, item_to_move, target_row):
+        """
+        递归地处理干涉方块，将它们移动到目标行。
+
+        参数：
+        - item_to_move: 要移动的物品对象
+        - target_row: 目标行
+
+        返回：
+        - 无返回值
+        """
+        # 移动物品并检查冲突
+        for new_y in range(target_row, target_row + item_to_move.y):
+            item_to_move.move(new_y)
+            # 在这里检查是否与其他物品冲突
+            for other_item in self.items.values():
+                if other_item != item_to_move:
+                    if self.check_collision(item_to_move, other_item):
+                        # 处理冲突，可能需要采取适当的措施
+                        print(f"冲突发生：{item_to_move.item_id} 与 {other_item.item_id}")
+                        # 递归地处理干涉方块
+                        self.move_interference_item(other_item, target_row)
 
     def handle_interference(self, interference_items, method=1):
         if method == 1:
@@ -163,58 +322,6 @@ class WarehouseEnvironment:
                 if (0 <= upper_y) and (lower_y < self.height):
                     if not any(self.grid[upper_y:lower_y, item['x']]):
                         self.add_item(item['x'], upper_y, item['size'])
-
-    def move_interference_items(self, item_to_move, target_row):
-        """
-        递归地处理干涉方块，将它们移动到目标行。
-
-        参数：
-        - item_to_move: 要移动的物品对象
-        - target_row: 目标行
-
-        返回：
-        - 无返回值
-        """
-        # 检查干涉方块
-        interference_items = self.find_interference_items(item_to_move.x, target_row)
-
-        if interference_items:
-            for interference_item in interference_items:
-                # 移动干涉方块到目标行
-                new_y = target_row + 1 if interference_item.y < target_row else target_row - 1
-                self.move_item(interference_item, new_y)
-
-                # 递归调用，处理可能继续的干涉方块
-                self.move_interference_items(interference_item, target_row)
-
-    def move_item(self, item, target_position):
-        """
-        将物品移动到目标位置
-
-        参数：
-        - item: 要移动的物品对象
-        - target_position: 目标位置
-
-        返回：
-        - 无返回值
-        """
-        # 检查目标位置是否合法
-        if target_position < 0 or target_position >= self.width:
-            raise ValueError("目标位置不合法")
-
-        # 检查目标位置是否有物品
-        if self.grid[item.y, target_position] != 0:
-            raise ValueError("目标位置已经有物品")
-
-        # 检查目标位置是否有干涉方块
-        interference_items = self.find_interference_items(target_position, item.y)
-        if interference_items:
-            raise ValueError("目标位置有干涉方块")
-
-        # 移动物品
-        self.grid[item.y, item.x] = 0
-        self.grid[item.y, target_position] = item.id
-        item.x = target_position
 
     def render(self):
         plt.figure(figsize=(5, 5))
@@ -262,8 +369,11 @@ def main():
 
     # 示例用法：添加物品并显示环境
     env.check_item('B001', 0, 114, 11, 8, '2017/9/1', 13, '2017/9/22')
+    env.check_item('B003', 8, 114, 11, 8, '2017/9/1', 13, '2017/9/22')
     env.check_item('B002', 0, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
+    env.move_to_target_position(env.get_item_by_id('B001'), 74)
     env.render()
+    env.move_to_target_row(env.get_item_by_id('B003'), 11)
 
 
 if __name__ == "__main__":

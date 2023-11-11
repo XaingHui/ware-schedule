@@ -1,3 +1,5 @@
+from collections import defaultdict, deque
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -13,8 +15,8 @@ class Item:
         self.start_time = datetime.strptime(start_time, '%Y/%m/%d')  # 最早开工时间
         self.processing_time = processing_time  # 加工周期
         self.exit_time = datetime.strptime(exit_time, '%Y/%m/%d')  # 最早出场时间
-        self.x = None  # 物品的 x 坐标
-        self.y = None  # 物品的 y 坐标
+        self.x = 0  # 物品的 x 坐标
+        self.y = 0  # 物品的 y 坐标
         self.color = color  # 可选：为物品添加颜色属性
 
     def __str__(self):
@@ -30,8 +32,9 @@ class WarehouseEnvironment:
         self.width = width
         self.height = height
         self.number = number
-        self.segment_widths = []  # 存储每个物品的分段宽度
-        self.y_axis_ticks = []  # 用于存储刻度值
+        self.segment_width_queues = {}  # 存储不同分段宽度的队列
+        self.segment_widths = []  # 存储已添加物品的分段宽度
+        self.segment_heights = []  # 存储已添加物品的分段高度
         self.grid = np.zeros((height, width), dtype=int)
         self.agent_position = (0, 0)
         self.target_positions = [(width - 1, i) for i in range(height)]
@@ -41,7 +44,10 @@ class WarehouseEnvironment:
         self.road = {'x': width, 'width': 20, 'color': 'lightgray'}  # 道路属性
         # Initialize the initial state
         self.item_cache = []  # 创建一个缓存队列来存储待添加的物品
+        self.queue_by_row_width = defaultdict(deque)
+
         self.initial_state = self.get_state()
+
 
     def get_state(self):
         agent_position = self.agent_position  # 代理机器人的位置
@@ -104,33 +110,47 @@ class WarehouseEnvironment:
         if len(self.items) == 0:
             x = 0
             y = 0
-        else:
-            prev_item = list(self.items.values())[-1]
-            prev_x = prev_item.x
-            prev_width = prev_item.width
-            prev_length = prev_item.length
-
-            # 计算当前物品的坐标
-            x = prev_x + prev_width
-            y = prev_item.y
-
-            # 检查是否需要换行
-            if x + width > self.width:
-                x = 0
-                y += prev_length
+        if len(self.items) == 1:
+            x = 0
+            first_item = list(self.items.values())[-1]
+            y = self.height - first_item.length
+        if len(self.items) > 1:
+            # 过滤物品 根据不同的height
+            dict_items = self.filter_items()
+            for index in self.segment_heights:
+                list_items = list(dict_items[f'items_{index}'])
+                prev_item = list_items[-1]
+                prev_x = prev_item.x
+                prev_width = prev_item.width
+                current_item = list_items[0]
+                if current_item.length != prev_item.length:
+                    # 计算当前物品的坐标
+                    x = 0
+                    y = self.height - prev_item.length
+                else:
+                    x = prev_x + prev_width
+                    y = self.height - prev_item.length
 
         # 存储分段宽度
-        self.segment_widths.append(width)
+        # self.segment_widths.append(width)
+        if sum(self.segment_heights) < self.height:
+            self.segment_heights.append(length)
+        else:
+            pass
+            # 这里写如何处理多出来的物品，比如添加到队列中保存
+
         if (x, y) not in self.items:
             item_color = self.colors[len(self.items) % len(self.colors)]
             item = Item(item_id, length, width, start_time, processing_time, exit_time, item_color)
             size = length * width
             item.x = x
             item.y = y
-            item.size = length * width / 10
+            item.size = length * width
             # item.color = color
             self.items[(x, y)] = item
             # self.grid[y, x] = item.x, item.y
+            # 将物品添加到对应行宽的队列
+            self.queue_by_row_width[width].append(item)
             # 将物品信息添加到环境网格中
             for i in range(size):
                 for j in range(size):
@@ -144,6 +164,25 @@ class WarehouseEnvironment:
             # 可以搬出目标方块
             return True
         return False
+
+    def filter_item(self, height):
+        filter_list = list(filter(lambda item: item[1].length == height, self.items.items()))
+        result = []
+        for _, item in filter_list:
+            result.append(item)
+        return result
+
+    def filter_items(self):
+        dict_items = {}
+        dict_item = {}
+        for height in self.segment_heights:
+            height_index = 'height_' + str(height)
+            dict_item[height_index] = height
+            items_index = 'items_' + str(height)
+            dict_item[items_index] = self.filter_item(height)
+            # print(dict_item)
+            dict_items.update(dict_item)
+        return dict_items
 
     def handle_interference(self, interference_items, method=1):
         if method == 1:
@@ -182,17 +221,11 @@ class WarehouseEnvironment:
                 # 有干涉方块，选择合适的方法
                 self.handle_interference(interference_items, method)
 
-    def calculate_y_axis_ticks(self):
-        # 计算y轴的刻度值
-        remaining_height = self.height
-        for segment_width in self.segment_widths:
-            # 计算每个刻度值，确保它们的总和等于height
-            segment_height = (segment_width / sum(self.segment_widths)) * self.height
-            self.y_axis_ticks.append(segment_height)
-            remaining_height -= segment_height
-
-        # 添加剩余的刻度值，确保总和等于height
-        self.y_axis_ticks.append(remaining_height)
+    def calculate_y_position(self):
+        current_y = 0  # 初始化y坐标
+        for segment_width in self.unique_segment_widths:
+            self.y_positions.append(self.height - (current_y + segment_width))
+            current_y += segment_width
 
     def render(self):
 
@@ -203,30 +236,33 @@ class WarehouseEnvironment:
         # 绘制刻度标签
         plt.xticks(x_ticks, fontsize=8)
         plt.imshow(np.ones((self.height, self.width + 20)), cmap='binary', interpolation='none', origin='upper')
-        unique_segment_widths = list(set(self.segment_widths))
+        # unique_segment_widths = list(set(self.segment_widths))
+        unique_segment_heights = list(set(self.segment_heights))
 
         # 创建一个列表来存储y轴刻度的位置
         y_positions = []
         current_y = 0  # 初始化y坐标
-        for segment_width in unique_segment_widths:
-            y_positions.append(current_y + segment_width / 2)
-            current_y += segment_width
+        # for segment_width in unique_segment_widths:
+        #     y_positions.append(self.height - (current_y + segment_width))
+        #     current_y += segment_width
+        for segment_height in unique_segment_heights:
+            y_positions.append(self.height - (current_y + segment_height))
+            current_y += segment_height
 
-        # 倒序unique_segment_widths
-        unique_segment_widths = unique_segment_widths[::-1]
         # 设置y轴刻度标签的位置和标签
-        plt.yticks(y_positions, unique_segment_widths, fontsize=8)
+        plt.yticks(y_positions, unique_segment_heights, fontsize=8)
 
-        for (x, y), item in self.items.items():
-            rect = plt.Rectangle((x, y), item.size, item.size, color=item.color, alpha=0.5)
-            plt.gca().add_patch(rect)
+        for row_width, item_queue in self.queue_by_row_width.items():
+            for item in item_queue:
+                x, y = item.x, item.y
+                rect = plt.Rectangle((x, y), item.width, item.length, color=item.color, alpha=0.5)
+                plt.gca().add_patch(rect)
 
         road_x = self.road['x']
         road_width = self.road['width']
         road_color = self.road['color']
         road_rect = plt.Rectangle((road_x, 0), road_width, self.height, color=road_color, alpha=1)
         plt.gca().add_patch(road_rect)
-        # plt.grid(True, which='both', color='black', linewidth=1)
         plt.show()
 
 
