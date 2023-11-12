@@ -45,6 +45,7 @@ class Item:
 
 class WarehouseEnvironment:
     def __init__(self, width, height, number, time='2017/9/1'):
+        self.prev_target_position = (0, 0)
         self.width = width
         self.height = height
         self.number = number
@@ -68,11 +69,11 @@ class WarehouseEnvironment:
         self.target_position = (x, y)
 
     def simulate_time_passage(self):
-        # 判断是否过了24秒，如果是，增加一天
+        # 判断是否过了1秒，如果是，增加一分钟
         start_time = self.start_time.second
         end_time = datetime.now().second
         hours = abs(int(end_time - start_time))
-        self.current_time += timedelta(hours=hours)
+        self.current_time += timedelta(minutes=hours)
 
     def get_state(self):
         agent_position = self.agent_position  # 代理机器人的位置
@@ -85,30 +86,39 @@ class WarehouseEnvironment:
 
         return state
 
-    def step(self, action):
+    def binary_forward(self):
         move_x_distance = 1  # 默认移动距离
         move_y_distance = 1  # 默认移动距离
         distance_x_to_target = abs(self.agent_position[0] - self.target_position[0])
         distance_y_to_target = abs(self.agent_position[1] - self.target_position[1])
-        if distance_x_to_target > 50:
+
+        if distance_x_to_target > self.width / 2:
             move_x_distance = int(distance_x_to_target / 2)  # 如果距离大于20，则调整移动距离
-        elif distance_x_to_target > 30 < 50:
-            move_x_distance = int(distance_x_to_target / 2)    # 如果距离大于20，则调整移动距离
-        elif distance_x_to_target > 20 < 30:
+        elif distance_x_to_target > self.width / 4 < self.width / 2:
             move_x_distance = int(distance_x_to_target / 2)
-        elif distance_x_to_target > 10 < 20:
+        elif distance_x_to_target > self.width / 8 < self.width / 4:
             move_x_distance = int(distance_x_to_target / 2)
-        # 如果距离大于20，则调整移动距离
-        if distance_y_to_target > 50:
+        elif distance_x_to_target > self.width / 16 < self.width / 8:
+            move_x_distance = int(distance_x_to_target / 2)
+
+        if distance_y_to_target > self.height / 2:
             move_y_distance = int(distance_y_to_target / 2)
-            # 如果距离大于20，则调整移动距离
-        elif distance_y_to_target > 30 < 50:
+        elif distance_y_to_target > self.height / 4 < self.height / 2:
             move_y_distance = int(distance_y_to_target / 2)
-            # 如果距离大于20，则调整移动距离
-        elif distance_y_to_target > 20 < 30:
-            move_y_distance = int(distance_y_to_target / 2) # 如果距离大于20，则调整移动距离
-        elif distance_y_to_target > 10 < 20:
+        elif distance_y_to_target > self.height / 8 < self.height / 4:
             move_y_distance = int(distance_y_to_target / 2)
+        elif distance_y_to_target > self.height / 16 < self.height / 8:
+            move_y_distance = int(distance_y_to_target / 2)
+
+        return move_x_distance, move_y_distance
+
+    def step(self, action):
+        if len(self.items) == 0:
+            done = True
+            reward = 10000
+            new_state = self.get_state()
+            return new_state, reward, done, {}
+        move_x_distance, move_y_distance = self.binary_forward()
         reward = 0
         item = Item('B000', 0, 0, 0, 0, '2017/9/1', 0, '2017/9/29', 'red')
         if self.target_position == (0, 0):
@@ -118,7 +128,6 @@ class WarehouseEnvironment:
             self.get_target_position(item.x, item.y)
 
         # 记录之前的代理机器人位置
-        prev_agent_position = self.agent_position
         if self.agent_position[0] > self.target_position[0]:
             reward -= 100
         if self.agent_position[1] > self.target_position[1]:
@@ -127,16 +136,16 @@ class WarehouseEnvironment:
         # 执行动作并更新环境状态
         if action == 0:  # 代理机器人向上移动
             self.agent_position = (self.agent_position[0], max(0, self.agent_position[1] - move_y_distance))
-            time.sleep(0.01 * move_y_distance)  # 模拟移动的时间
+            time.sleep(0.001 * move_y_distance)  # 模拟移动的时间
         elif action == 1:  # 代理机器人向下移动
             self.agent_position = (self.agent_position[0], min(self.height, self.agent_position[1] + move_y_distance))
-            time.sleep(0.01 * move_y_distance)
+            time.sleep(0.001 * move_y_distance)
         elif action == 2:  # 代理机器人向左移动
             self.agent_position = (max(0, self.agent_position[0] - move_x_distance), self.agent_position[1])
-            time.sleep(0.01 * move_x_distance)
+            time.sleep(0.001 * move_x_distance)
         elif action == 3:  # 代理机器人向右移动
-            self.agent_position = (min(self.width , self.agent_position[0] + move_x_distance), self.agent_position[1])
-            time.sleep(0.01 * move_x_distance)
+            self.agent_position = (min(self.width, self.agent_position[0] + move_x_distance), self.agent_position[1])
+            time.sleep(0.001 * move_x_distance)
         else:
             print("Invalid action!")
             reward = -100
@@ -144,18 +153,25 @@ class WarehouseEnvironment:
         # 计算奖励
         x_distance_to_target = abs(self.agent_position[0] - self.target_position[0])
         y_distance_to_target = abs(self.agent_position[1] - self.target_position[1])
-        reward += 300.0 - x_distance_to_target - y_distance_to_target  # 根据距离计算奖励
+        reward += 200.0 - x_distance_to_target - y_distance_to_target  # 根据距离计算奖励
 
         # 检查是否到达目标位置，根据情况返回奖励
         if self.agent_position == self.target_position:
             reward += 300  # 到达目标位置的奖励
             if self.target_position[0] >= 75:
-                self.target_position = (0, 0)
                 # 根据目标坐标找到item
-
+                for (k, v) in self.items.items():
+                    if k[0] == self.prev_target_position[0] and k[1] == self.prev_target_position[1]:
+                        item = v
+                        self.move_to_target_position(item, self.agent_position)
+                        self.render()
+                        reward += 800  # 拾取物品的奖励
+                        break
+                self.target_position = (0, 0)
                 done = True  # 任务完成
             else:
-                self.target_position = self.width, item.y
+                self.prev_target_position = self.target_position
+                self.target_position = self.width, self.agent_position[1]
                 done = False
         else:
             done = False
@@ -163,8 +179,8 @@ class WarehouseEnvironment:
         self.simulate_time_passage()
         # 更新状态
         new_state = self.get_state()
+        self.clean_on_road()
         self.render()  # 更新环境
-
         return new_state, reward, done, {}
 
     def reset(self):
@@ -235,6 +251,16 @@ class WarehouseEnvironment:
 
         return item2
 
+    def clean_on_road(self):
+        """
+        清除道路上的物品
+        :return:
+        """
+        for (k, v) in self.items.items():
+            if k[0] >= 75:
+                self.remove_item(v)
+                break
+
     def move_to_target_row(self, item, target_row):
         # 检查是否满足条件搬出目标方块
         if item.length <= target_row and abs(item.length - target_row) <= 2:
@@ -256,13 +282,12 @@ class WarehouseEnvironment:
         参数：
         - item: 要移动的物品对象
         - target_position: 目标位置
-
         返回：
         - 无返回值
         """
         # 检查目标位置是否合法
-        if target_position < 0 or target_position >= \
-                self.width + self.road['width']:
+        if target_position[0] < 0 or target_position[1] < 0 or target_position[0] >= \
+                self.width + self.road['width'] or target_position[1] >= self.height:
             raise ValueError("目标位置不合法")
         # item_target = Item('tmp',)
         # if self.check_collision() and self.move_out_to_other_row(item, target_position):
@@ -273,7 +298,7 @@ class WarehouseEnvironment:
         start_time = str(item.start_time).replace('-', '/').strip(' 00:00:00')
         exit_time = str(item.exit_time).replace('-', '/').strip(' 00:00:00')
 
-        self.check_item(tmp_item.item_id, tmp_item.x, target_position, tmp_item.length,
+        self.check_item(tmp_item.item_id, target_position[0], target_position[1], tmp_item.length,
                         tmp_item.width, start_time,
                         tmp_item.processing_time, exit_time)
 

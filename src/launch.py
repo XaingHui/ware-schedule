@@ -28,7 +28,7 @@ def add_items_from_csv(env, csv_file):
 
 def launch():
     # 创建环境实例
-    env = WarehouseEnvironment(width=75, height=153, number=50,)
+    env = WarehouseEnvironment(width=75, height=153, number=50, time=datetime.now().strftime('2017/11/1'))
 
     # 示例用法：从CSV文件中读取货物信息并添加到环境
     # add_items_from_csv(env, 'data1.csv')

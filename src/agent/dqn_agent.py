@@ -31,7 +31,6 @@ class DQNAgent:
         return model
 
     def choose_action(self, state, agent_position, target_position, count):
-
         if np.random.rand() <= self.epsilon and count > 0:
             return np.random.choice(self.action_size)
         # 计算机器人当前位置和目标位置之间的水平和垂直距离
@@ -57,6 +56,10 @@ class DQNAgent:
         self.memory.append((state, action, reward, next_state, done))
 
     def train(self, batch_size=32):
+        import tensorflow as tf
+        # 在适当的位置调用TensorFlow的清理函数
+        tf.keras.backend.clear_session()
+
         if len(self.memory) < batch_size:
             return
         batch = random.sample(self.memory, batch_size)
@@ -75,13 +78,10 @@ def main():
     env = WarehouseEnvironment(width=75, height=153, number=50)
     # 示例用法：添加物品并显示环境
     env.check_item('B001', 0, 114, 11, 8, '2017/9/1', 13, '2017/9/22')
-    env.check_item('B003', 8, 114, 11, 8, '2017/9/1', 13, '2017/9/22')
+    # env.check_item('B003', 8, 114, 11, 8, '2017/9/1', 13, '2017/9/22')
     env.check_item('B002', 0, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
-    env.check_item('B004', 11, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
+    # env.check_item('B004', 11, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
     env.check_item('B005', 22, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
-    env.check_item('B006', 33, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
-    env.check_item('B007', 44, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
-    env.check_item('B008', 55, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
     # env.move_to_target_position(env.get_item_by_id('B001'), 74)
     env.render()
     state_size = len(env.get_state())
@@ -103,7 +103,7 @@ def main():
         # print(state)
         total_reward = 0
         done = False
-        count = 20
+        count = 5
         while not done:
             action = agent.choose_action(state, agent_position, target_position, count)
             next_state, reward, done, _ = env.step(action)
@@ -122,9 +122,10 @@ def main():
             total_reward += reward
             state = next_state
             count -= 1
+            if len(env.items) == 0:
+                total_reward = 10000
+                break
         print(f"Episode: {episode + 1}, Total Reward: {total_reward}")
-
-    env.render()
 
 
 if __name__ == "__main__":
