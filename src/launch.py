@@ -1,6 +1,7 @@
 import csv
 from datetime import datetime
 
+from src.agent.dqn_agent import DQNAgent
 from src.env.env import WarehouseEnvironment
 
 
@@ -61,6 +62,9 @@ def launch():
     # agent.save_model('trained_agent')
     # 显示环境
     env.render()
+
+    dqn_agent = DQNAgent
+    dqn_agent.launch(env)
 
 
 if __name__ == "__main__":

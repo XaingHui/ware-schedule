@@ -1,3 +1,5 @@
+import csv
+
 import numpy as np
 import tensorflow
 from tensorflow.keras.models import Sequential
@@ -27,7 +29,7 @@ class DQNAgent:
         model.add(Dense(24, input_dim=self.state_size, activation='relu'))
         model.add(Dense(24, activation='relu'))
         model.add(Dense(self.action_size, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        model.compile(loss='mse', optimizer=Adam(learning_rate=self.learning_rate))
         return model
 
     def choose_action(self, state, agent_position, target_position, count):
@@ -73,16 +75,81 @@ class DQNAgent:
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
+    def launch(env):
+        state_size = len(env.get_state())
+        action_size = 4  # 代表上移、下移和不执行动作
+        agent = DQNAgent(state_size, action_size)
+
+        episodes = 1000
+
+        for episode in range(episodes):
+            state = env.get_state()  # Get the initial state
+            agent_position = np.array(list(state['agent_position']))
+            target_position = np.array(list(state['target_positions']))
+            # item_positions = np.array(list(state['item_positions']))
+            print(env.current_time)
+            # 将这些位置信息合并成一个数组
+            state_array = np.concatenate([agent_position, target_position])
+            #  print(state_array)
+            state = np.reshape(state_array, [-1, state_size])
+            # print(state)
+            total_reward = 0
+            done = False
+            count = 5
+            while not done:
+                action = agent.choose_action(state, agent_position, target_position, count)
+                next_state, reward, done, _ = env.step(action)
+                print(next_state)
+                agent_position = np.array(list(next_state['agent_position']))
+                target_position = np.array(list(next_state['target_positions']))
+                # item_positions = np.array(list(state['item_positions']))
+
+                # 将这些位置信息合并成一个数组
+                next_state_array = np.concatenate([agent_position, target_position])
+                next_state = np.reshape(next_state_array, [-1, state_size])
+
+                agent.remember(state, action, reward, next_state, done)
+                agent.train()
+
+                total_reward += reward
+                state = next_state
+                count -= 1
+                if len(env.items) == 0:
+                    total_reward = 10000
+                    break
+            print(f"Episode: {episode + 1}, Total Reward: {total_reward}")
+
+
+# def add_items_from_csv(env, csv_file):
+#     with open(csv_file, 'r') as file:
+#         csv_reader = csv.reader(file)
+#         next(csv_reader)  # 跳过 CSV 文件的标题行
+#
+#         for row in csv_reader:
+#             item_id = row[0]
+#             x = int(row[1])
+#             y = int(row[2])
+#             length = int(row[3])
+#             width = int(row[4])
+#             start_time = str(row[5])
+#             processing_time = int(row[6])
+#             exit_time = str(row[7])
+#
+#             # 添加物品到环境
+#             env.check_item(item_id, x, y, length, width, start_time, processing_time, exit_time)
+
 
 def main():
     env = WarehouseEnvironment(width=75, height=153, number=50)
     # 示例用法：添加物品并显示环境
     env.check_item('B001', 0, 114, 11, 8, '2017/9/1', 13, '2017/9/22')
-    # env.check_item('B003', 8, 114, 11, 8, '2017/9/1', 13, '2017/9/22')
-    env.check_item('B002', 0, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
-    # env.check_item('B004', 11, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
+    env.check_item('B003', 8, 114, 11, 8, '2017/9/2', 13, '2017/9/22')
+    env.check_item('B002', 0, 101, 13, 11, '2017/9/3', 16, '2017/9/29')
+    env.check_item('B004', 11, 101, 13, 11, '2017/9/2', 16, '2017/9/29')
     env.check_item('B005', 22, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
     # env.move_to_target_position(env.get_item_by_id('B001'), 74)
+
+    # add_items_from_csv(env, 'data_test.csv')
     env.render()
     state_size = len(env.get_state())
     action_size = 4  # 代表上移、下移和不执行动作

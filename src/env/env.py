@@ -73,7 +73,7 @@ class WarehouseEnvironment:
         start_time = self.start_time.second
         end_time = datetime.now().second
         hours = abs(int(end_time - start_time))
-        self.current_time += timedelta(minutes=hours)
+        self.current_time += timedelta(hours=hours)
 
     def get_state(self):
         agent_position = self.agent_position  # 代理机器人的位置
@@ -112,14 +112,22 @@ class WarehouseEnvironment:
 
         return move_x_distance, move_y_distance
 
+
+
     def step(self, action):
-        if len(self.items) == 0:
+        if len(self.items) and len(self.cache_items) == 0:
             done = True
             reward = 10000
             new_state = self.get_state()
             return new_state, reward, done, {}
+        if len(self.cache_items):
+            for item in self.cache_items:
+                start_time = str(item.start_time).replace('-', '/').strip(' 00:00:00')
+                exit_time = str(item.exit_time).replace('-', '/').strip(' 00:00:00')
+                self.check_item(item.item_id, item.x, item.y, item.width, item.length, start_time, item.processing_time,exit_time)
         move_x_distance, move_y_distance = self.binary_forward()
         reward = 0
+
         item = Item('B000', 0, 0, 0, 0, '2017/9/1', 0, '2017/9/29', 'red')
         if self.target_position == (0, 0):
             # 随机获取一个物品的坐标
@@ -221,14 +229,45 @@ class WarehouseEnvironment:
         self.render()
 
     def check_item(self, item_id, x, y, length, width, start_time, processing_time, exit_time):
+        """
+        检查到达的物品对象。
+        如果物品的到达时间早于当前时间，则将物品添加到环境中。
+        如果物品的到达时间晚于当前时间，则将物品添加到缓存列表中。等到时间到达时再将物品添加到环境中。
+
+        参数：
+        - item: 到达的物品对象
+
+        返回：
+        - 无返回值
+        """
         item = self.add_item(item_id, x, y, length, width, start_time, processing_time, exit_time)
         if self.current_time >= item.start_time:
             size = item.length * item.width
+            com_y_items = self.filter_item_by_y(item.y)
+            print("com_y_items")
+            print(com_y_items)
+
             self.items[(item.x, item.y)] = item
             # 将物品信息添加到环境网格中
             for i in range(size):
                 for j in range(size):
                     self.grid[item.y, item.x] = len(self.items)
+                    return True
+        else:
+            self.cache_items.append(item)
+            return False
+
+    def filter_item_by_y(self, y):
+        """
+        过滤相同物品的 y 坐标。
+
+        :return: items列表
+        """
+        items = []
+        for (k, v) in self.items.items():
+            if k[1] == y:
+                items.append(v)
+        return items
 
     def check_collision(self, item1, item2):
         """
@@ -325,6 +364,12 @@ class WarehouseEnvironment:
                         # 递归地处理干涉方块
                         self.move_interference_item(other_item, target_row)
 
+    def is_move_in(self):
+        if self.cache_items:
+            for item in self.cache_items:
+                if item.start_time <= self.current_time:
+                    return True
+
     def handle_interference(self, interference_items, method=1):
         if method == 1:
             # 方法1：先将干涉方块搬出场地，目标方块搬出后，将干涉方块按出场时间降序排列，重新放入场内
@@ -347,6 +392,23 @@ class WarehouseEnvironment:
                 if (0 <= upper_y) and (lower_y < self.height):
                     if not any(self.grid[upper_y:lower_y, item['x']]):
                         self.add_item(item['x'], upper_y, item['size'])
+
+    def move_in_item(self):
+        """
+        将物品移入场地
+
+        参数：
+        - 无参数
+
+        返回：
+        - 无返回值
+        """
+        # 检查是否有物品需要移入场地
+        if self.cache_items:
+            # 检查是否有物品需要移入场地
+            for item in self.cache_items:
+                if self.check_item(item['x'], item['y'], item['size']):
+                    self.cache_items.remove_item(item)
 
     def render(self):
         plt.figure(figsize=(5, 5))
