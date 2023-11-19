@@ -151,7 +151,7 @@ class WarehouseEnvironment:
                 done = True
                 reward = 10000
                 new_state = self.get_state()
-                self.total_step_time += (datetime.now() - step_time).total_seconds()
+                self.total_step_time = 0
                 self.total_step_time = round(self.total_step_time, 5)
                 step_info = {
                     'action': action,
@@ -269,7 +269,7 @@ class WarehouseEnvironment:
         #        self.remove_item_by_id(item_id)
         self.render()  # 更新环境
         self.total_reward += reward
-        self.total_step_time += (datetime.now() - step_time ).total_seconds()
+        self.total_step_time += (datetime.now() - step_time).total_seconds()
         self.total_step_time = round(self.total_step_time, 5)
         step_info = {
             'action': action,
