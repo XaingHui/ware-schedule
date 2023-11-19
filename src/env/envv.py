@@ -64,6 +64,8 @@ class WarehouseEnvironment:
         self.current_time = datetime.strptime(time, '%Y/%m/%d')  # 最早出场时间
         self.agent_has_item = False
         self.carried_item = None
+        self.item = Item('tmp', self.agent.x, self.agent.y, 1, 1, '2017/9/1', 0, '2017/9/1', 'red')
+        self.task_positions = []
         self.initial_state = {
             'agent_position': self.agent_position,
             'target_positions': self.target_position,
@@ -97,8 +99,8 @@ class WarehouseEnvironment:
     def binary_forward(self):
         move_x_distance = 1  # 默认移动距离
         move_y_distance = 1  # 默认移动距离
-        distance_x_to_target = abs(self.agent_position[0] - self.target_position[0])
-        distance_y_to_target = abs(self.agent_position[1] - self.target_position[1])
+        distance_x_to_target = abs(self.agent.x - self.target_position[0])
+        distance_y_to_target = abs(self.agent.y - self.target_position[1])
 
         if distance_x_to_target > self.width / 2:
             move_x_distance = int(distance_x_to_target / 2)  # 如果距离大于20，则调整移动距离
@@ -120,13 +122,12 @@ class WarehouseEnvironment:
 
         return move_x_distance, move_y_distance
 
-
     def step(self, action):
-        if len(self.items) == 0 and len(self.cache_items) == 0:
-            done = True
-            reward = 10000
-            new_state = self.get_state()
-            return new_state, reward, done, {}
+        # if len(self.items) == 0 and len(self.cache_items) == 0 :
+        #     done = True
+        #     reward = 10000
+        #     new_state = self.get_state()
+        #     return new_state, reward, done, {}
         if len(self.cache_items) > 0:
             for i in range(len(self.cache_items)):
                 item = self.cache_items.pop(i)
@@ -140,47 +141,65 @@ class WarehouseEnvironment:
         move_x_distance, move_y_distance = self.binary_forward()
         reward = 0
 
-        item = Item('B000', 0, 0, 0, 0, '2017/9/1', 0, '2017/9/29', 'red')
         if self.target_position == (0, 0):
+            if len(self.items) == 0:
+                done = True
+                reward = 10000
+                new_state = self.get_state()
+                return new_state, reward, done, {}
             # 随机获取一个物品的坐标
-            item = np.random.choice(list(self.items.values()))
+            value = np.random.choice(list(self.items.values()))
+            item = self.items.get((value.x, value.y))
+            self.item = item
+            for k, v in self.items.items():
+                print(k, v.item_id)
+            self.remove_item(item)
+
             # 获取目标位置
-            self.get_target_position(item.x, item.y)
+            self.get_target_position(self.item.x, self.item.y)
 
         # 记录之前的代理机器人位置
-        if self.agent_position[0] > self.target_position[0]:
+        if self.agent.x > self.target_position[0]:
             reward -= 100
-        if self.agent_position[1] > self.target_position[1]:
+        if self.agent.y > self.target_position[1]:
             reward -= 100
 
         # 执行动作并更新环境状态
         if action == 0:  # 代理机器人向上移动
-            self.agent_position = (self.agent_position[0], max(0, self.agent_position[1] - move_y_distance))
+            self.agent_position = (self.agent.x, max(0, self.agent.y - move_y_distance))
+            self.agent.x, self.agent.y = self.agent_position
             time.sleep(0.001 * move_y_distance)  # 模拟移动的时间
         elif action == 1:  # 代理机器人向下移动
-            self.agent_position = (self.agent_position[0], min(self.height, self.agent_position[1] + move_y_distance))
+            self.agent_position = (self.agent.x, min(self.height, self.agent.y + move_y_distance))
+            self.agent.x, self.agent.y = self.agent_position
             time.sleep(0.001 * move_y_distance)
         elif action == 2:  # 代理机器人向左移动
-            self.agent_position = (max(0, self.agent_position[0] - move_x_distance), self.agent_position[1])
+            self.agent_position = (max(0, self.agent.x - move_x_distance), self.agent.y)
+            self.agent.x, self.agent.y = self.agent_position
             time.sleep(0.001 * move_x_distance)
         elif action == 3:  # 代理机器人向右移动
-            self.agent_position = (min(self.width, self.agent_position[0] + move_x_distance), self.agent_position[1])
+            self.agent_position = (min(self.width, self.agent.x + move_x_distance), self.agent.y)
+            self.agent.x, self.agent.y = self.agent_position
             time.sleep(0.001 * move_x_distance)
         else:
             print("Invalid action!")
             reward = -100
 
-            # 更新carried_item的位置
-            if self.agent_has_item:
-                self.carried_item.move(self.agent_position[0], self.agent_position[1])
+            # # 更新carried_item的位置
+            # if self.agent_has_item:
+            #     self.carried_item.move(self.agent.x, self.agent.y)
 
         # 计算奖励
-        x_distance_to_target = abs(self.agent_position[0] - self.target_position[0])
-        y_distance_to_target = abs(self.agent_position[1] - self.target_position[1])
+        x_distance_to_target = abs(self.agent.x - self.target_position[0])
+        y_distance_to_target = abs(self.agent.y - self.target_position[1])
         reward += 200.0 - x_distance_to_target - y_distance_to_target  # 根据距离计算奖励
 
         if self.agent_position == self.target_position:
             # 代理机器人到达目标位置
+            self.agent = self.item
+            if len(self.agent.item_id) < 10:
+                self.agent.item_id = 'agent_' + str(self.item.item_id)
+            self.agent.color = 'red'
             reward += 300  # 到达目标位置的奖励
             if self.target_position[0] >= 75:
                 # 根据目标坐标找到item
@@ -189,45 +208,44 @@ class WarehouseEnvironment:
                         item = v
                         # self.move_to_target_position(item, self.agent_position)
                         # 修改状态表示代理机器人携带物品
-                        self.agent_has_item = True
-                        self.carried_item = item
-
+                        # self.agent_has_item = True
+                        # self.carried_item = item
+                        self.item = self.getInitItem()
                         self.render()
-                        reward += 800  # 拾取物品的奖励
+                        reward += 800  # 成功搬运物品的奖励
                         break
                 self.target_position = (0, 0)
-                print(self.carried_item.item_id)
-                if self.carried_item in self.items:
-                    self.remove_item(self.carried_item)
-                self.carried_item = None
                 done = True  # 任务完成
             else:
                 self.prev_target_position = self.target_position
-                self.target_position = self.width, self.agent_position[1]
+                self.target_position = self.width, self.agent.y
                 done = False
         else:
             done = False
         # 在代理机器人移动过程中检测冲突
-        if self.agent_has_item:
-            self.carried_item.x = self.agent_position[0]
-            self.carried_item.y = self.agent_position[1]
-            for other_item in self.items.values():
-                if other_item != self.carried_item and self.check_collision(self.carried_item, other_item):
-                    # 处理冲突
-                    print(
-                        f"冲突发生：代理机器人携带的物品与其他物品冲突  " + other_item.item_id + self.carried_item.item_id)
+        for other_item in self.items.values():
+            # print(self.agent.item_id.strip('agent_'))
+            if other_item.item_id.strip('agent_') != self.agent.item_id.strip('agent_') and self.check_collision(
+                    self.agent, other_item) and len(self.task_positions) == 0:
+                # 处理冲突
+                print(
+                    f"冲突发生：代理机器人携带的物品与其他物品冲突  " + other_item.item_id.strip('agent_') + "     " +
+                    self.agent.item_id.strip('agent_'))
 
-                    # # 随机选择一种处理方式
-                    # random_action = choice(
-                    #     [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
-                    #
-                    # # 执行随机选择的处理方式
-                    # random_action(other_item)
-                    self.handle_conflict_2(other_item)
+                # # 随机选择一种处理方式
+                # random_action = choice(
+                #     [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
+                #
+                # # 执行随机选择的处理方式
+                # random_action(other_item)
+                self.handle_conflict_1(other_item)
         self.simulate_time_passage()
         # 更新状态
         new_state = self.get_state()
-        item_id = self.clean_on_road()
+        self.clean_on_road()
+        print("现在的物品有:")
+        for k, v in self.items.items():
+            print(k, v.item_id)
         #        self.remove_item_by_id(item_id)
         self.render()  # 更新环境
         return new_state, reward, done, {}
@@ -245,30 +263,36 @@ class WarehouseEnvironment:
         """
         处理冲突的方式1：重新放置干涉方块
         """
-        self.interfering_items.append(self.carried_item)
-        self.target_position = interfering_item.x, interfering_item.y
-        self.carried_item = interfering_item
+
+        self.task_positions.append((self.agent.x, self.agent.y))
+        self.task_positions.append((interfering_item.x, interfering_item.y))
+        self.remove_item(interfering_item)
+        self.items.update({(self.agent.x, self.agent.y): self.agent})
+        self.item = interfering_item
+        self.agent = self.item
+        self.agent.color = 'red'
+
+        print("冲突解决1： 现在的agent携带的物品是  " + self.agent.item_id.strip('agent_'))
+        print("冲突解决1： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
+        self.target_position = self.task_positions.pop(-1)
 
     def handle_conflict_2(self, interfering_item):
         """
         处理冲突的方式2：移动至相邻的上下行
         """
         # 对于每个与目标方块冲突的干涉方块，检查上下行是否有位置
-        self.carried_item = interfering_item
-        self.target_position = interfering_item.x, interfering_item.y
-        self.interfering_items.append(interfering_item)
+        self.task_positions.append((self.agent.x, self.agent.y))
         target_row = self.get_target_row(interfering_item)
+        self.task_positions.append((interfering_item.x, interfering_item.y + target_row))
         if target_row is not None:
             # 移动干涉方块至相邻的上下行中
-            self.target_position = interfering_item.x, target_row + interfering_item.y
-
+            self.target_position = self.task_positions.pop(-1)
         # 待目标方块搬出后，不将这些干涉方块放回原所在行
 
     def handle_conflict_3(self, interfering_item):
         """
         处理冲突的方式3：直接从邻行搬出
         """
-        interfering_items = self.find_interfering_items()
         #
         # for interfering_item in interfering_items:
         #     # 对于每个与目标方块冲突的干涉方块，检查目标方块上下所在行是否有方块阻挡
@@ -314,9 +338,6 @@ class WarehouseEnvironment:
             :param item:
         """
         # 在这里添加检查冲突的逻辑，例如检查与其他物体的碰撞等
-        # ...
-
-        # 示例：假设存在一个名为 check_collision 的方法
         item = Item(current_item.item_id, current_item.x, current_item.y + target_row, current_item.length,
                     current_item.width,
                     current_item.start_time, current_item.processing_time, current_item.exit_time, current_item.color)
@@ -382,14 +403,7 @@ class WarehouseEnvironment:
         if self.current_time >= item.start_time:
             size = item.length * item.width
             self.items[(item.x, item.y)] = item
-            # 将物品信息添加到环境网格中
-            for i in range(size):
-                for j in range(size):
-                    self.grid[item.y, item.x] = len(self.items)
-            #
-            # for item in com_y_items:
-            #     print(item.item_id)
-
+            self.render()
             return True
         else:
             if item not in self.cache_items:
@@ -477,7 +491,6 @@ class WarehouseEnvironment:
                         tmp_item.width, start_time,
                         tmp_item.processing_time, exit_time)
 
-
     def render(self):
         plt.figure(figsize=(5, 5))
         # 创建 x 轴刻度标签
@@ -510,12 +523,17 @@ class WarehouseEnvironment:
         road_color = self.road['color']
         road_rect = plt.Rectangle((road_x, 0), road_width, self.height, color=road_color, alpha=1)
         plt.gca().add_patch(road_rect)
+
         plt.show()
 
     def get_item_by_id(self, id):
         for item in self.items.values():
             if item.item_id == id:
                 return item
+
+    def getInitItem(self):
+        init_item = Item('tmp', self.agent.x, self.agent.y, 1, 1, '2017/9/1', 0, '2017/9/1', 'red')
+        return init_item
 
 
 def main():

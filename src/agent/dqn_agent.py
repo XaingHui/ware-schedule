@@ -8,7 +8,7 @@ from tensorflow.keras.optimizers import Adam
 from collections import deque
 import random
 
-from src.env.env import WarehouseEnvironment
+from src.env.envv import WarehouseEnvironment
 
 
 class DQNAgent:
@@ -114,9 +114,9 @@ class DQNAgent:
                 total_reward += reward
                 state = next_state
                 count -= 1
-                if len(env.items) == 0:
-                    total_reward = 10000
-                    break
+                # if len(env.items) == 0:
+                #     total_reward = 10000
+                #     break
             print(f"Episode: {episode + 1}, Total Reward: {total_reward}")
 
 
@@ -140,14 +140,20 @@ class DQNAgent:
 
 
 def main():
-    env = WarehouseEnvironment(width=75, height=153, number=50)
+    env = WarehouseEnvironment(width=75, height=153, number=50,time='2017/9/2')
     # 示例用法：添加物品并显示环境
     env.check_item('B001', 0, 114, 11, 8, '2017/9/1', 13, '2017/9/22')
-    env.check_item('B003', 8, 114, 11, 8, '2017/9/2', 13, '2017/9/22')
-    env.check_item('B002', 0, 101, 13, 11, '2017/9/3', 16, '2017/9/29')
-    env.check_item('B004', 11, 101, 13, 11, '2017/9/2', 16, '2017/9/29')
-    env.check_item('B005', 22, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
-    # env.move_to_target_position(env.get_item_by_id('B001'), 74)
+    env.check_item('B003', 37, 114, 11, 8, '2017/9/2', 13, '2017/9/22')
+    # env.check_item('B007', 19, 114, 11, 8, '2017/9/2', 13, '2017/9/29')
+    # env.check_item('B009', 40, 114, 11, 8, '2017/9/2', 13, '2017/9/27')
+    # env.check_item('B0013', 60, 114, 11, 8, '2017/9/2', 13, '2017/9/21')
+    env.render()
+    # env.check_item('B002', 0, 101, 13, 11, '2017/9/3', 16, '2017/9/29')
+    # env.render()
+    # env.check_item('B004', 11, 101, 13, 11, '2017/9/2', 16, '2017/9/29')
+    # env.render()
+    # env.check_item('B005', 22, 101, 13, 11, '2017/9/1', 16, '2017/9/29')
+    # # env.move_to_target_position(env.get_item_by_id('B001'), 74)
 
     # add_items_from_csv(env, 'data_test.csv')
     env.render()
@@ -189,9 +195,9 @@ def main():
             total_reward += reward
             state = next_state
             count -= 1
-            if len(env.items) == 0:
-                total_reward = 10000
-                break
+            # if len(env.items) == 0:
+            #     total_reward = 10000
+            #     break
         print(f"Episode: {episode + 1}, Total Reward: {total_reward}")
 
 
