@@ -1,3 +1,4 @@
+import csv
 import time
 
 import numpy as np
@@ -63,6 +64,8 @@ class WarehouseEnvironment:
         self.target_position = (0, 0)  # 目标位置列表
         self.current_time = datetime.strptime(time, '%Y/%m/%d')  # 最早出场时间
         self.agent_has_item = False
+        self.total_reward = 0
+        self.total_step_time = 0
         self.carried_item = None
         self.item = Item('tmp', self.agent.x, self.agent.y, 1, 1, '2017/9/1', 0, '2017/9/1', 'red')
         self.task_positions = []
@@ -71,6 +74,7 @@ class WarehouseEnvironment:
             'target_positions': self.target_position,
         }
         self.cache_items = []
+        self.step_records = []
         self.interfering_items = []
         self.start_time = datetime.now()
         self.get_target_position()
@@ -128,6 +132,7 @@ class WarehouseEnvironment:
         #     reward = 10000
         #     new_state = self.get_state()
         #     return new_state, reward, done, {}
+        step_time = datetime.now()
         if len(self.cache_items) > 0:
             for i in range(len(self.cache_items)):
                 item = self.cache_items.pop(i)
@@ -146,6 +151,21 @@ class WarehouseEnvironment:
                 done = True
                 reward = 10000
                 new_state = self.get_state()
+                self.total_step_time += (datetime.now() - step_time).total_seconds()
+                self.total_step_time = round(self.total_step_time, 5)
+                step_info = {
+                    'action': action,
+                    'agent_position': self.agent_position,
+                    'target_position': self.target_position,
+                    'total_reward': reward,
+                    'elapsed_time': self.total_step_time,
+                }
+                self.step_records.append(step_info)
+
+                if done:
+                    self.save_records_to_csv()
+                    self.total_step_time = datetime.now()
+                    self.total_reward = 0
                 return new_state, reward, done, {}
             # 随机获取一个物品的坐标
             value = np.random.choice(list(self.items.values()))
@@ -157,7 +177,6 @@ class WarehouseEnvironment:
 
             # 获取目标位置
             self.get_target_position(self.item.x, self.item.y)
-
         # 记录之前的代理机器人位置
         if self.agent.x > self.target_position[0]:
             reward -= 100
@@ -225,7 +244,6 @@ class WarehouseEnvironment:
         # 在代理机器人移动过程中检测冲突
         for other_item in self.items.values():
             # print(self.agent.item_id.strip('agent_'))
-            print(len(self.task_positions))
             if other_item.item_id.strip('agent_') != self.agent.item_id.strip('agent_') and self.check_collision(
                     self.agent, other_item) and len(self.task_positions) == 0:
                 # 处理冲突
@@ -250,7 +268,33 @@ class WarehouseEnvironment:
             print(k, v.item_id)
         #        self.remove_item_by_id(item_id)
         self.render()  # 更新环境
+        self.total_reward += reward
+        self.total_step_time += (datetime.now() - step_time ).total_seconds()
+        self.total_step_time = round(self.total_step_time, 5)
+        step_info = {
+            'action': action,
+            'agent_position': self.agent_position,
+            'target_position': self.target_position,
+            'total_reward': self.total_reward,
+            'elapsed_time': self.total_step_time
+
+        }
+        self.step_records.append(step_info)
+
+        if done:
+            self.save_records_to_csv()
+            self.total_step_time = 0
+            self.total_reward = 0
         return new_state, reward, done, {}
+
+    def save_records_to_csv(self):
+        with open('simulation_records.csv', mode='w', newline='') as file:
+            fieldnames = ['action', 'agent_position', 'target_position', 'total_reward', 'elapsed_time']
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+
+            writer.writeheader()
+            for record in self.step_records:
+                writer.writerow(record)
 
     def remove_item_by_id(self, item_id):
         """
@@ -305,7 +349,6 @@ class WarehouseEnvironment:
         if target_row is not None:
             # 移动干涉方块至相邻的上下行中
             self.target_position = self.task_positions.pop(-1)
-
 
     def get_target_row(self, current_item):
         """
