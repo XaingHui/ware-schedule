@@ -54,6 +54,10 @@ class DQNAgent:
             else:
                 return 0  # 上移
 
+    def random_choose_action(self, state, agent_position, target_position, count):
+        if np.random.rand() <= self.epsilon and count > 0:
+            return np.random.choice(self.action_size)
+
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
 
@@ -140,7 +144,7 @@ class DQNAgent:
 
 
 def main():
-    env = WarehouseEnvironment(width=75, height=153, number=50,time='2017/9/2')
+    env = WarehouseEnvironment(width=75, height=153, number=50, time='2017/9/2')
     # 示例用法：添加物品并显示环境
     env.check_item('B001', 0, 114, 11, 8, '2017/9/1', 13, '2017/9/22')
     env.check_item('B003', 37, 114, 11, 8, '2017/9/2', 13, '2017/9/22')

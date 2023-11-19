@@ -225,6 +225,7 @@ class WarehouseEnvironment:
         # 在代理机器人移动过程中检测冲突
         for other_item in self.items.values():
             # print(self.agent.item_id.strip('agent_'))
+            print(len(self.task_positions))
             if other_item.item_id.strip('agent_') != self.agent.item_id.strip('agent_') and self.check_collision(
                     self.agent, other_item) and len(self.task_positions) == 0:
                 # 处理冲突
@@ -238,7 +239,8 @@ class WarehouseEnvironment:
                 #
                 # # 执行随机选择的处理方式
                 # random_action(other_item)
-                self.handle_conflict_1(other_item)
+                self.handle_conflict_2(other_item)
+
         self.simulate_time_passage()
         # 更新状态
         new_state = self.get_state()
@@ -264,7 +266,7 @@ class WarehouseEnvironment:
         处理冲突的方式1：重新放置干涉方块
         """
 
-        self.task_positions.append((self.agent.x, self.agent.y))
+        # self.task_positions.append((self.agent.x, self.agent.y))
         self.task_positions.append((interfering_item.x, interfering_item.y))
         self.remove_item(interfering_item)
         self.items.update({(self.agent.x, self.agent.y): self.agent})
@@ -274,7 +276,10 @@ class WarehouseEnvironment:
 
         print("冲突解决1： 现在的agent携带的物品是  " + self.agent.item_id.strip('agent_'))
         print("冲突解决1： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
-        self.target_position = self.task_positions.pop(-1)
+        # self.target_position = self.task_positions.pop(-1)
+        self.task_positions.append((75, interfering_item.y))
+        print("任务位置有： ")
+        print(self.task_positions)
 
     def handle_conflict_2(self, interfering_item):
         """
@@ -293,12 +298,14 @@ class WarehouseEnvironment:
         """
         处理冲突的方式3：直接从邻行搬出
         """
-        #
-        # for interfering_item in interfering_items:
-        #     # 对于每个与目标方块冲突的干涉方块，检查目标方块上下所在行是否有方块阻挡
-        #     if not self.is_blocked_by_items(interfering_item):
-        #         # 如果没有方块阻挡，直接将干涉方块从邻行搬出
-        #         self.move_out_of_warehouse(interfering_item)
+        # 对于每个与目标方块冲突的干涉方块，检查上下行是否有位置
+        self.task_positions.append((self.agent.x, self.agent.y))
+        target_row = self.get_target_row(interfering_item)
+        self.task_positions.append((interfering_item.x, interfering_item.y + target_row))
+        if target_row is not None:
+            # 移动干涉方块至相邻的上下行中
+            self.target_position = self.task_positions.pop(-1)
+
 
     def get_target_row(self, current_item):
         """
