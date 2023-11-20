@@ -245,7 +245,7 @@ class WarehouseEnvironment:
         for other_item in self.items.values():
             # print(self.agent.item_id.strip('agent_'))
             if other_item.item_id.strip('agent_') != self.agent.item_id.strip('agent_') and self.check_collision(
-                    self.agent, other_item) and len(self.task_positions) == 0:
+                    self.agent, other_item) and len(self.task_positions) == 0 :
                 # 处理冲突
                 print(
                     f"冲突发生：代理机器人携带的物品与其他物品冲突  " + other_item.item_id.strip('agent_') + "     " +
@@ -257,8 +257,21 @@ class WarehouseEnvironment:
                 #
                 # # 执行随机选择的处理方式
                 # random_action(other_item)
-                self.handle_conflict_2(other_item)
+                self.handle_conflict_1(other_item)
 
+        if len(self.task_positions) > 0:
+            print("任务位置的长度是：", len(self.task_positions))
+            print("任务位置是：", self.task_positions[-1][0], self.task_positions[-1][1])
+        if len(self.task_positions) > 0 and self.agent.x == self.task_positions[-1][0] \
+                and self.agent.y == self.task_positions[-1][1]:
+            self.target_position = self.task_positions.pop(-1)
+        if len(self.task_positions) == 0 and len(self.interfering_items) != 0:
+            item = self.interfering_items.pop(-1)
+            if self.target_position[0] == item.x and self.target_position[1] == item.y:
+                start_time = str(item.start_time).replace('-', '/').strip(' 00:00:00')
+                exit_time = str(item.exit_time).replace('-', '/').strip(' 00:00:00')
+                self.check_item(item.item_id, item.x, item.y, item.length, item.width, start_time, item.processing_time,
+                                exit_time)
         self.simulate_time_passage()
         # 更新状态
         new_state = self.get_state()
@@ -317,7 +330,7 @@ class WarehouseEnvironment:
         self.item = interfering_item
         self.agent = self.item
         self.agent.color = 'red'
-
+        self.interfering_items.append(interfering_item)
         print("冲突解决1： 现在的agent携带的物品是  " + self.agent.item_id.strip('agent_'))
         print("冲突解决1： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
         # self.target_position = self.task_positions.pop(-1)
