@@ -56,7 +56,7 @@ class WarehouseEnvironment:
         self.number = number
         self.segment_heights = [20, 19, 18, 16, 15, 13, 13, 11, 10, 9, 8]  # 存储已添加物品的分段高度
         self.grid = np.zeros((height, width + 20), dtype=object)
-        self.agent = Item('agent', 0, 0, 1, 1, time, 0, time, 'red')
+        self.agent = Item('agent', 0, 0, 5, 5, time, 0, time, 'black')
         self.agent_position = self.agent.x, self.agent.y
         self.items = {}
         self.colors = list(mcolors.TABLEAU_COLORS)
@@ -66,7 +66,7 @@ class WarehouseEnvironment:
         self.agent_has_item = False
         self.total_reward = 0
         self.total_step_time = 0
-        self.item = Item('tmp', self.agent.x, self.agent.y, 1, 1, '2017/9/1', 0, '2017/9/1', 'red')
+        self.item = Item('tmp', self.agent.x, self.agent.y, 5, 5, '2017/9/1', 0, '2017/9/1', 'black')
         self.task_positions = []
         self.initial_state = {
             'agent_position': self.agent_position,
@@ -230,6 +230,18 @@ class WarehouseEnvironment:
             reward -= 100
 
         if self.agent_position == self.target_position:
+            print("现在干涉物品的长度：  " + str(len(self.interfering_items)))
+            if len(self.interfering_items) != 0 and self.agent_has_item is False and self.target_position[0] < 75:
+                item = self.interfering_items[-1]
+                print("干扰物品的是：", item.item_id)
+                print("干扰物品的位置：", item.x, item.y)
+                print("机器人到达要添加物品的位置：", item.x, item.y)
+                item = self.interfering_items.pop(-1)
+                start_time = str(item.start_time).replace('-', '/').strip(' 00:00:00')
+                exit_time = str(item.exit_time).replace('-', '/').strip(' 00:00:00')
+                self.check_item(item.item_id, item.x, item.y, item.length, item.width, start_time,
+                                item.processing_time,
+                                exit_time)
             # 代理机器人到达目标位置
             self.agent = self.item
             self.agent_has_item = True
@@ -281,17 +293,8 @@ class WarehouseEnvironment:
             print("当前任务位置是：", self.target_position[0], self.target_position[1])
             print("下一步任务位置是：", self.task_positions[-1][0], self.task_positions[-1][1])
 
-        if len(self.interfering_items) != 0 and self.agent_has_item is False:
-            item = self.interfering_items[-1]
-            print("干扰物品的是：", item.item_id)
-            print("干扰物品的位置：", item.x, item.y)
-            if self.agent.x == item.x and self.agent.y == item.y:
-                print("机器人到达要添加物品的位置：", item.x, item.y)
-                item = self.interfering_items.pop(-1)
-                start_time = str(item.start_time).replace('-', '/').strip(' 00:00:00')
-                exit_time = str(item.exit_time).replace('-', '/').strip(' 00:00:00')
-                self.check_item(item.item_id, item.x, item.y, item.length, item.width, start_time, item.processing_time,
-                                exit_time)
+
+
 
         if len(self.task_positions) > 0 and self.agent.x == self.target_position[0] \
                 and self.agent.y == self.target_position[1]:
@@ -495,7 +498,6 @@ class WarehouseEnvironment:
         if self.current_time >= item.start_time:
             size = item.length * item.width
             self.items[(item.x, item.y)] = item
-            self.render()
             return True
         else:
             if item not in self.cache_items:
@@ -564,6 +566,17 @@ class WarehouseEnvironment:
         # 设置y轴刻度标签的位置和标签
 
         plt.yticks(y_positions, self.segment_heights, fontsize=8)
+
+        # Draw agent
+        agent_x = self.agent.x
+        agent_y = self.agent.y
+        agent_width = self.agent.width
+        agent_length = self.agent.length
+        agent_color = self.agent.color
+
+        agent_rect = plt.Rectangle((agent_x, agent_y), agent_width, agent_length, color=agent_color, alpha=0.5)
+        plt.gca().add_patch(agent_rect)
+
         for (x, y), item in self.items.items():
             rect = plt.Rectangle((x, y), item.width, item.length, color=item.color, alpha=0.5)
             plt.gca().add_patch(rect)
@@ -586,7 +599,7 @@ class WarehouseEnvironment:
                 return item
 
     def getInitItem(self):
-        init_item = Item('tmp', self.agent.x, self.agent.y, 1, 1, '2017/9/1', 0, '2017/9/1', 'red')
+        init_item = Item('tmp', self.agent.x, self.agent.y, 5, 5, '2017/9/1', 0, '2017/9/1', 'black')
         return init_item
 
 
