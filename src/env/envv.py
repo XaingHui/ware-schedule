@@ -248,12 +248,12 @@ class WarehouseEnvironment:
             if len(self.agent.item_id) < 10:
                 self.agent.item_id = 'agent_' + str(self.item.item_id)
             self.agent.color = 'red'
-            reward += 300  # 到达目标位置的奖励
+            reward += 100  # 到达目标位置的奖励
             if self.target_position[0] >= 75:
                 self.item = self.getInitItem()
                 self.agent = self.item
                 self.agent_has_item = False
-                reward += 800  # 成功搬运物品的奖励
+                reward += 500  # 成功搬运物品的奖励
                 self.task_positions.append((0, 0))
                 self.target_position = self.task_positions.pop(-1)
                 if len(self.task_positions) == 0:
@@ -270,10 +270,10 @@ class WarehouseEnvironment:
         print("代理机器人的状态： ", self.agent.item_id, self.agent.x, self.agent.y)
         print("是否携带物品：", self.agent_has_item)
         if self.agent_has_item is True:
-            for other_item in self.items.values():
+            for other_item in list(self.items.values()):
                 # print(self.agent.item_id.strip('agent_'))
                 if other_item.item_id.strip('agent_') != self.agent.item_id.strip(
-                        'agent_') and len(self.task_positions) == 0 and self.check_collision(self.agent, other_item):
+                        'agent_') and self.check_collision(self.agent, other_item):
                     # 处理冲突
                     print(
                         f"冲突发生：代理机器人携带的物品与其他物品冲突  " + other_item.item_id.strip(
@@ -286,15 +286,13 @@ class WarehouseEnvironment:
                     #
                     # # 执行随机选择的处理方式
                     # random_action(other_item)
-                    self.handle_conflict_1(other_item)
+                    self.handle_conflict_2(other_item)
+                    reward -= 300  # 冲突的惩罚
 
         if len(self.task_positions) > 0:
             print("任务位置的长度是：", len(self.task_positions))
             print("当前任务位置是：", self.target_position[0], self.target_position[1])
             print("下一步任务位置是：", self.task_positions[-1][0], self.task_positions[-1][1])
-
-
-
 
         if len(self.task_positions) > 0 and self.agent.x == self.target_position[0] \
                 and self.agent.y == self.target_position[1]:
@@ -337,16 +335,7 @@ class WarehouseEnvironment:
         """
         处理冲突的方式1：重新放置干涉方块
         """
-        self.task_positions.append((interfering_item.x, interfering_item.y))
-        self.interfering_items.append(interfering_item)
-        self.remove_item(interfering_item)
-        print("干扰物品位置： " + str(interfering_item.x), str(interfering_item.y))
-        self.items.update({(interfering_item.x, interfering_item.y): self.agent})
-
-        self.item = interfering_item
-        self.agent = self.item
-        self.agent_has_item = True
-        self.agent.color = 'red'
+        self.exchange_agent_item(interfering_item)
 
         print("冲突解决1： 现在的agent携带的物品是  " + self.agent.item_id.strip('agent_'))
         print("冲突解决1： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
@@ -361,21 +350,25 @@ class WarehouseEnvironment:
         """
         处理冲突的方式2：移动至相邻的上下行
         """
-        self.task_positions.append((interfering_item.x, interfering_item.y))
-        self.remove_item(interfering_item)
-        # print("干扰物品位置： " + str(interfering_item.x), str(interfering_item.y))
-        self.items.update({(self.agent.x, self.agent.y): self.agent})
-        self.item = interfering_item
-        self.agent = self.item
-        self.agent.color = 'red'
+        # self.task_positions.append((interfering_item.x, interfering_item.y))
+        #
+        # self.remove_item(interfering_item)
+        # # print("干扰物品位置： " + str(interfering_item.x), str(interfering_item.y))
+        # self.items.update({(self.agent.x, self.agent.y): self.agent})
+        # self.item = interfering_item
+        # self.agent = self.item
+        # self.agent.color = 'red'
+        self.exchange_agent_item(interfering_item)
         print("冲突解决2： 现在的agent携带的物品是  " + self.agent.item_id.strip('agent_'))
         print("冲突解决2： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
 
         target_row = self.get_target_row(interfering_item)
-        self.task_positions.append((interfering_item.x, interfering_item.y + target_row))
-        interfering_item.y = interfering_item.y + target_row
-        self.interfering_items.append(interfering_item)
-        self.task_positions.append((interfering_item.x, interfering_item.y - target_row))
+        # self.task_positions.append((interfering_item.x, interfering_item.y + target_row))
+        # interfering_item.y = interfering_item.y + target_row
+        # self.interfering_items.append(interfering_item)
+        # self.task_positions.append((interfering_item.x, interfering_item.y - target_row))
+        self.task_positions = [(8, 114), (8, 127)]
+        self.target_position = self.task_positions.pop(-1)
         print("任务位置有： ")
         print(self.task_positions)
 
@@ -394,6 +387,21 @@ class WarehouseEnvironment:
         if target_row is not None:
             # 移动干涉方块至相邻的上下行中
             self.target_position = self.task_positions.pop(-1)
+
+    def exchange_agent_item(self, interfering_item):
+        """
+        交换agent和interfering_item
+        """
+        self.task_positions.append((interfering_item.x, interfering_item.y))
+        self.interfering_items.append(interfering_item)
+        self.remove_item(interfering_item)
+        print("干扰物品位置： " + str(interfering_item.x), str(interfering_item.y))
+        self.items.update({(self.agent.x, self.agent.y): self.agent})
+
+        self.item = interfering_item
+        self.agent = self.item
+        self.agent_has_item = True
+        self.agent.color = 'red'
 
     def get_target_row(self, current_item):
         """
@@ -483,19 +491,19 @@ class WarehouseEnvironment:
         """
         item = self.add_item(item_id, x, y, length, width, start_time, processing_time, exit_time)
 
-        # # 检查相同 y 坐标的物品
-        # com_y_items = self.filter_item_by_y(item.y)
-        # com_y_items.sort(key=lambda x: x.exit_time, reverse=True)
-        #
-        # if com_y_items:
-        #     # 如果存在相同 y 坐标的物品，则设置添加物品的 x 为前面物品的 x + length
-        #     last_item = com_y_items[0]
-        #     item.x = last_item.x + last_item.width
-        # else:
-        #     # 如果不存在相同 y 坐标的物品，则设置添加物品的 x 为 0
-        #     item.x = 0
-
         if self.current_time >= item.start_time:
+            # 检查相同 y 坐标的物品
+            com_y_items = self.filter_item_by_y(item.y)
+            com_y_items.sort(key=lambda x: x.exit_time, reverse=True)
+
+            if com_y_items:
+                # 如果存在相同 y 坐标的物品，则设置添加物品的 x 为前面物品的 x + width
+                last_item = com_y_items[0]
+                item.x = last_item.x + last_item.width
+            else:
+                # 如果不存在相同 y 坐标的物品，则设置添加物品的 x
+                item.x = item.x
+
             size = item.length * item.width
             self.items[(item.x, item.y)] = item
             return True
