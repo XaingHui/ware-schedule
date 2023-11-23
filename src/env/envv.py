@@ -366,7 +366,6 @@ class WarehouseEnvironment:
         target_row = self.get_target_row(interfering_item)
         self.task_positions.append((interfering_item.x, interfering_item.y + target_row))
         interfering_item.y = interfering_item.y + target_row
-        interfering_item.x = interfering_item.x - 19
         self.interfering_items.append(interfering_item)
         self.task_positions.append((interfering_item.x, interfering_item.y - target_row))
         print("任务位置有： ")
