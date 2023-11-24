@@ -7,8 +7,6 @@ import matplotlib.colors as mcolors
 
 from datetime import datetime, timedelta
 
-from random import choice, random
-
 
 class Item:
     def __init__(self, item_id, x, y, length, width, start_time, processing_time, exit_time, color):
@@ -43,10 +41,6 @@ class Item:
         bottom = self.y + self.length
         return left, top, right, bottom
 
-    def move(self, x, y):
-        self.x = x
-        self.y = y
-
 
 class WarehouseEnvironment:
     def __init__(self, width, height, number, time='2017/9/1'):
@@ -76,10 +70,6 @@ class WarehouseEnvironment:
         self.step_records = []
         self.interfering_items = []
         self.start_time = datetime.now()
-        self.get_target_position()
-
-    def get_target_position(self, x=0, y=0):
-        self.target_position = (x, y)
 
     def simulate_time_passage(self):
         # 判断是否过了1秒，如果是，增加一分钟
@@ -271,7 +261,6 @@ class WarehouseEnvironment:
         print("是否携带物品：", self.agent_has_item)
         if self.agent_has_item is True:
             for other_item in list(self.items.values()):
-                # print(self.agent.item_id.strip('agent_'))
                 if other_item.item_id.strip('agent_') != self.agent.item_id.strip(
                         'agent_') and self.check_collision(self.agent, other_item):
                     # 处理冲突
@@ -322,15 +311,6 @@ class WarehouseEnvironment:
             for record in self.step_records:
                 writer.writerow(record)
 
-    def remove_item_by_id(self, item_id):
-        """
-        根据ID删除物品
-        """
-        for k, v in self.items.items():
-            if v.item_id == item_id:
-                self.remove_item(v)
-                break
-
     def handle_conflict_1(self, interfering_item):
         """
         处理冲突的方式1：重新放置干涉方块
@@ -361,7 +341,8 @@ class WarehouseEnvironment:
         self.exchange_agent_item(interfering_item)
         print("冲突解决2： 现在的agent携带的物品是  " + self.agent.item_id.strip('agent_'))
         print("冲突解决2： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
-
+        print(self.agent.__str__())
+        print(self.item.__str__())
         target_row = self.get_target_row(interfering_item)
         # self.task_positions.append((interfering_item.x, interfering_item.y + target_row))
         # interfering_item.y = interfering_item.y + target_row
@@ -525,6 +506,7 @@ class WarehouseEnvironment:
         return items_com
 
     def check_collision(self, item1, item2):
+        epsilon = 0.1  # 误差
         """
         检查两个矩形是否相交。
 
@@ -537,10 +519,10 @@ class WarehouseEnvironment:
         """
         rectangle1 = item1.get_rectangle()
         rectangle2 = item2.get_rectangle()
-        if not (rectangle1[2] < rectangle2[0] or  # 左
-                rectangle1[0] > rectangle2[2] or  # 右
-                rectangle1[3] < rectangle2[1] or  # 上
-                rectangle1[1] > rectangle2[3]):
+        if not (rectangle1[2] + epsilon < rectangle2[0] or  # 左
+                rectangle1[0] + epsilon > rectangle2[2] or  # 右
+                rectangle1[3] + epsilon < rectangle2[1] or  # 上
+                rectangle1[1] + epsilon > rectangle2[3]):
             return True
         return False
 

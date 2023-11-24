@@ -2,7 +2,7 @@ import csv
 from datetime import datetime
 
 from src.agent.dqn_agent import DQNAgent
-from src.env.env import WarehouseEnvironment
+from src.env.envv import WarehouseEnvironment
 
 
 def add_items_from_csv(env, csv_file):
