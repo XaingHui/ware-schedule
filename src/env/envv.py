@@ -421,7 +421,11 @@ class WarehouseEnvironment:
             :param current_item:
         """
         # 检查移动到上面的行是否会发生冲突
-        index = self.segment_heights.index(current_item.length)
+        if current_item.length not in self.segment_heights:
+            length = current_item.length + 1
+        else:
+            length = current_item.length
+        index = self.segment_heights.index(length)
         upper_row = self.segment_heights[index - 1]
         if not self.is_conflict_with_target(upper_row, current_item):
             return upper_row
