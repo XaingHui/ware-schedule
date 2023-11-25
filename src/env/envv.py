@@ -152,7 +152,10 @@ class WarehouseEnvironment:
             time.sleep(0.001 * move_y_distance)  # 模拟移动的时间
         elif action == 1:  # 代理机器人向下移动
             self.agent_position = (self.agent.x, min(self.height, self.agent.y + move_y_distance))
-            self.agent.x, self.agent.y = self.agent_position
+            if self.agent_position[1] + self.agent.length > self.height:
+                self.agent_position = (self.agent.x, self.height - self.agent.length)
+            else:
+                self.agent.x, self.agent.y = self.agent_position
             time.sleep(0.001 * move_y_distance)
         elif action == 2:  # 代理机器人向左移动
             self.agent_position = (max(0, self.agent.x - move_x_distance), self.agent.y)
@@ -184,7 +187,6 @@ class WarehouseEnvironment:
         move_x_distance, move_y_distance = self.binary_forward()
         # 奖励初始化
         reward = 0
-
 
         if self.target_position == (0, 0):
             if len(self.items) == 0 and len(self.cache_items) == 0:
@@ -396,8 +398,10 @@ class WarehouseEnvironment:
         self.task_positions.append((interfering_item.x, interfering_item.y))
         self.agent.item_id = self.agent.item_id.strip('agent_')
         self.items.update({(self.agent.x, self.agent.y): self.agent})
-        if interfering_item not in self.interfering_items:
-            self.interfering_items.append(interfering_item)
+        for item in self.interfering_items:
+            if interfering_item.id != item.item_id:
+                self.interfering_items.append(interfering_item)
+                break
         self.remove_item(interfering_item)
         print("干扰物品位置： " + str(interfering_item.x), str(interfering_item.y))
 
