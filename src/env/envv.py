@@ -204,8 +204,8 @@ class WarehouseEnvironment:
 
             if len(self.items) > 0 and self.target_position == (0, 0):
                 # 随机获取一个物品的坐标
-                # value = np.random.choice(list(self.items.values()))
-                value = list(self.items.values())[0]
+                value = np.random.choice(list(self.items.values()))
+                # value = list(self.items.values())[0]
                 self.item_random = self.items.get((value.x, value.y))
                 self.item = self.item_random
                 # self.remove_item(item_random)
@@ -447,6 +447,7 @@ class WarehouseEnvironment:
 
         Returns:
             is_conflict (bool): 是否与目标发生冲突，如果发生冲突则为 True，否则为 False
+            :param current_item:
             :param target_row:
             :param item:
         """

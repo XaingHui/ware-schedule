@@ -102,19 +102,19 @@ def add_items_from_csv(env, csv_file):
 def main():
     env = WarehouseEnvironment(width=75, height=153, number=50, time='2017/9/1')
     # # 示例用法：添加物品并显示环境
-    env.check_item('B001', 0, 114, 8, 5, '2017/9/1', 13, '2017/9/22')
-    env.check_item('B003', 20, 0, 8, 5, '2017/9/1', 13, '2017/9/22')
-    # env.check_item('B007', , 114, 11, 8, '2017/9/2', 13, '2017/9/29')
-    env.check_item('B009', 10, 127, 8, 5, '2017/9/1', 13, '2017/9/27')
-    env.check_item('B0011', 0, 114, 8, 5, '2017/9/1', 13, '2017/9/27')
+    # env.check_item('B001', 0, 114, 8, 5, '2017/9/1', 13, '2017/9/22')
+    # env.check_item('B003', 20, 0, 8, 5, '2017/9/1', 13, '2017/9/22')
+    # # env.check_item('B007', , 114, 11, 8, '2017/9/2', 13, '2017/9/29')
+    # env.check_item('B009', 10, 127, 8, 5, '2017/9/1', 13, '2017/9/27')
+    # env.check_item('B0011', 0, 114, 8, 5, '2017/9/1', 13, '2017/9/27')
 
-    # add_items_from_csv(env, '../data_test.csv')
+    add_items_from_csv(env, '../data_test.csv')
     env.render()
     state_size = len(env.get_state())
     action_size = 4  # 代表上移、下移和不执行动作
     agent = DQNAgent(state_size, action_size)
 
-    episodes = 1000
+    episodes = 10000
 
     for episode in range(episodes):
         state = env.get_state()  # Get the initial state

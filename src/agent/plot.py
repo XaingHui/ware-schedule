@@ -1,39 +1,88 @@
 import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.colors as mcolors
 
-# 读取CSV文件
-df = pd.read_csv('simulation_records.csv')
 
-# 初始化变量
-tasks = []
-current_task = {"total_reward": 0, "total_row": 0, "elapsed_time": 0}
+def analysis_csv(input_csv, output_csv):
 
-# 遍历数据框的每一行
-for index, row in df.iterrows():
-    if row['total_reward'] == 0 and current_task["total_reward"] != 0:
-        # 当出现动作为0且之前的任务的总奖励不为0时，表示一个任务结束
-        tasks.append(current_task)
-        current_task = {"total_reward": 0, "total_row": 0, "elapsed_time": 0}
-    else:
-        # 累加总奖励
-        if row['total_reward'] != 0:
-            current_task["total_row"] += 1
-        current_task["total_reward"] = row['total_reward']
-        current_task["elapsed_time"] = row["elapsed_time"]
+    # 从CSV文件读取数据
+    df = pd.read_csv(input_csv, header=None,
+                     names=["action", "agent_position", "target_position", "total_reward", "elapsed_time"])
 
-# 添加最后一个任务
-if current_task["total_reward"] != 0:
-    current_task["end_index"] = df.shape[0] - 1
-    tasks.append(current_task)
+    # 转换 'elapsed_time' 列为数值类型
+    df['elapsed_time'] = pd.to_numeric(df['elapsed_time'], errors='coerce')
+    df['total_reward'] = pd.to_numeric(df['total_reward'], errors='coerce')
 
-# 打印每个任务的总奖励和起始/结束索引
-for task in tasks:
-    print(f"Total Reward: {task['total_reward']}, Total Rows: {task['total_row']}, Elapsed Time: {task['elapsed_time']}")
+    # 删除转换后出现 NaN 值的行
+    df = df.dropna(subset=['elapsed_time'])
 
-# 打印任务的数量
-print(f"Total Number of Tasks: {len(tasks)}")
-# 创建输出结果的数据框
-result_df = pd.DataFrame({"Task": [i + 1 for i in range(len(tasks))], "Total Rows": [task['total_row'] for task in tasks],
-                         "Total Reward": [task['total_reward'] for task in tasks], "Elapsed Time": [task['elapsed_time'] for task in tasks]})
+    # 找到 elapsed_time 为负数的索引（表示任务结束）
+    end_indices = df[df['elapsed_time'].diff() < 0].index.tolist()
 
-# 将结果保存为CSV文件
-result_df.to_csv('out.csv', index=False)
+    # 提取每个任务的相关信息
+    tasks = []
+    for i in range(len(end_indices)):
+        start_index = 0 if i == 0 else end_indices[i - 1] + 1
+        end_index = end_indices[i]
+
+        task_data = df.iloc[start_index:end_index - 1]
+
+        total_rows = len(task_data)
+        elapsed_time = task_data['elapsed_time'].iloc[-1]  # 取最后一行的值即可
+        reward = task_data['total_reward'].iloc[-1]  # 取最后一行的值即可
+        total_elapsed_time = task_data['elapsed_time'].sum()
+        total_reward = task_data['total_reward'].sum()
+        tasks.append([total_rows, total_elapsed_time, total_reward, elapsed_time, reward])
+
+    # 创建DataFrame保存结果
+    result_df = pd.DataFrame(tasks,
+                             columns=['total_rows', 'total_elapsed_time', 'total_reward', 'elapsed_time', 'reward'])
+
+    # 将结果保存为CSV文件
+    result_df.to_csv(output_csv, index=False)
+
+
+# Specify a font that supports a wide range of Unicode characters
+plt.rcParams['font.sans-serif'] = ['SimHei']  # SimHei is a Chinese font, you can choose a different one if needed
+plt.rcParams['axes.unicode_minus'] = False  # This is to avoid minus sign display issues in some fonts
+
+
+def plot_task_analysis(dataframe):
+
+    num_tasks = len(dataframe)
+    colors = plt.cm.rainbow(np.linspace(0, 1, num_tasks))
+    # 1. 利用彩虹色绘制总奖励
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(dataframe.index.astype(int) + 1, dataframe['total_reward'] / dataframe['total_rows'], marker='o',
+            linestyle='-',
+            color=colors[1], label='Mean', linewidth=2)
+    ax.plot(dataframe.index.astype(int) + 1, dataframe['reward'], marker='o', linestyle='-', color=colors[2],
+            label='Max', linewidth=2)
+    ax.set_xlabel('Task')
+    ax.set_ylabel('Total_reward')
+    ax.legend(fontsize='large', frameon=False)  # 显示图例，并调整字体大小和去除边框
+
+    # 2. 绘制平均开销时间和实际开销时间
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(dataframe.index.astype(int) + 1, dataframe['total_elapsed_time'] / dataframe['total_rows'], marker='o',
+            linestyle='-',
+            color=colors[1], label='Mean', linewidth=2)
+    ax.plot(dataframe.index.astype(int) + 1, dataframe['elapsed_time'], marker='o', linestyle='-', color=colors[2],
+            label='Max', linewidth=2)
+    ax.set_xlabel('Task')
+    ax.set_ylabel('Elapsed_time')
+    ax.legend(fontsize='large', frameon=False)  # 显示图例，并调整字体大小和去除边框
+
+    # Adjust label font size
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label]):
+        item.set_fontsize(20)
+
+    plt.show()
+
+
+# 从CSV文件读取数据
+df = pd.read_csv('task_analysis_result.csv')
+
+# 调用函数进行绘图
+plot_task_analysis(df)
