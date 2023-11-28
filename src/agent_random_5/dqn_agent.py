@@ -8,7 +8,7 @@ from tensorflow.keras.optimizers import Adam
 from collections import deque
 import random
 
-from src.env_random_5.envv import WarehouseEnvironment
+from src.agent_random_5.env_random_5.envv import WarehouseEnvironment
 
 
 class DQNAgent:
@@ -32,9 +32,27 @@ class DQNAgent:
         model.compile(loss='mse', optimizer=Adam(learning_rate=self.learning_rate))
         return model
 
-    def random_choose_action(self, state, agent_position, target_position, count):
-        if np.random.rand() <= self.epsilon:
+    def choose_action(self, state, agent_position, target_position, count):
+        if np.random.rand() <= self.epsilon and count > 0:
             return np.random.choice(self.action_size)
+        # 计算机器人当前位置和目标位置之间的水平和垂直距离
+        distance_x = target_position[0] - agent_position[0]
+        distance_y = target_position[1] - agent_position[1]
+        # 获取当前Q值
+        # 根据距离选择行动
+        if abs(distance_x) > abs(distance_y):
+            # 在水平方向上的距离较大，选择左移或右移
+            if distance_x > 0:
+
+                return 3  # 右移
+            else:
+                return 2  # 左移
+        else:
+            # 在垂直方向上的距离较大，选择上移或下移
+            if distance_y > 0:
+                return 1  # 下移
+            else:
+                return 0  # 上移
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -78,13 +96,13 @@ def add_items_from_csv(env, csv_file):
 
 
 def main():
-    env = WarehouseEnvironment(width=75, height=100, number=50, time='2017/9/1')
+    env = WarehouseEnvironment(width=75, height=100, number=50, time='2017/9/2')
     # # 示例用法：添加物品并显示环境
-    env.check_item('B001', 0, 60, 8, 5, '2017/9/1', 13, '2017/9/22')
-    env.check_item('B003', 20, 0, 8, 5, '2017/9/1', 13, '2017/9/22')
+    env.check_item('B001', 0, 60, 8, 5, '2017/9/1', 13, '2017/9/2')
+    env.check_item('B003', 20, 0, 8, 5, '2017/9/1', 13, '2017/9/3')
     # # env.check_item('B007', , 114, 11, 8, '2017/9/2', 13, '2017/9/29')
-    env.check_item('B009', 10, 80, 8, 5, '2017/9/1', 13, '2017/9/27')
-    env.check_item('B0011', 0, 20, 8, 5, '2017/9/1', 13, '2017/9/27')
+    env.check_item('B009', 10, 80, 8, 5, '2017/9/1', 13, '2017/9/4')
+    env.check_item('B0011', 0, 20, 8, 5, '2017/9/1', 13, '2017/9/5')
 
     # add_items_from_csv(env, '../data_test.csv')
     env.render()
@@ -99,7 +117,7 @@ def main():
         agent_position = np.array(list(state['agent_position']))
         target_position = np.array(list(state['target_positions']))
         # item_positions = np.array(list(state['item_positions']))
-        print(env.current_time)
+
         # 将这些位置信息合并成一个数组
         state_array = np.concatenate([agent_position, target_position])
         #  print(state_array)
@@ -109,9 +127,10 @@ def main():
         done = False
         count = 5
         while not done:
-            action = agent.random_choose_action(state, agent_position, target_position, count)
+            action = agent.choose_action(state, agent_position, target_position, count)
             next_state, reward, done, _ = env.step(action)
             print(next_state)
+            print(env.current_time)
             agent_position = np.array(list(next_state['agent_position']))
             target_position = np.array(list(next_state['target_positions']))
             # item_positions = np.array(list(state['item_positions']))

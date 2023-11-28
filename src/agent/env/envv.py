@@ -1,4 +1,5 @@
 import csv
+import operator
 import time
 from random import choice
 
@@ -49,7 +50,7 @@ class WarehouseEnvironment:
         self.width = width
         self.height = height
         self.number = number
-        self.segment_heights = [20, 20, 20, 20, 20, 20]  # 存储已添加物品的分段高度
+        self.segment_heights = [20, 19, 18, 16, 15, 13, 13, 11, 10, 9, 8]  # 存储已添加物品的分段高度
         self.grid = np.zeros((height, width + 20), dtype=object)
         self.agent = Item('agent', 0, 0, 5, 5, time, 0, time, 'black')
         self.agent_position = self.agent.x, self.agent.y
@@ -63,6 +64,7 @@ class WarehouseEnvironment:
         self.total_step_time = 0
         self.item = Item('tmp', self.agent.x, self.agent.y, 5, 5, '2017/9/1', 0, '2017/9/1', 'black')
         self.task_positions = []
+        self.conflict_count = 0
         self.item_random = None
         self.initial_state = {
             'agent_has_item': self.agent_has_item,
@@ -79,7 +81,8 @@ class WarehouseEnvironment:
         start_time = self.start_time.second
         end_time = datetime.now().second
         hours = abs(int(end_time - start_time))
-        self.current_time += timedelta(hours=hours * 0.5)
+        self.current_time += timedelta(minutes=hours * 3)
+        print(self.current_time)
 
     def get_state(self):
         agent_position = self.agent_position  # 代理机器人的位置
@@ -137,12 +140,14 @@ class WarehouseEnvironment:
             'target_position': self.target_position,
             'total_reward': self.total_reward,
             'elapsed_time': self.total_step_time,
+            'conflict_count': self.conflict_count,
         }
         self.step_records.append(step_info)
         if done:
             self.save_records_to_csv()
             self.total_step_time = 0
             self.total_reward = 0
+            self.conflict_count = 0
 
     def agent_move(self, action, move_x_distance, move_y_distance):
         # 执行动作并更新环境状态
@@ -168,6 +173,35 @@ class WarehouseEnvironment:
         else:
             print("Invalid action!")
             reward = -100
+
+    def get_earliest_item(self):
+        if len(self.items) > 0 and self.target_position == (0, 0):
+            # 获取最早出场时间的物品
+            earliest_item = min(self.items.values(), key=operator.attrgetter('exit_time'))
+            print("earliest_item: ", earliest_item.item_id, earliest_item.exit_time)
+            print("current_time: ", self.current_time)
+            if earliest_item.exit_time <= self.current_time:
+                # 设置抽取的物品
+                self.item_random = earliest_item
+                self.item = self.item_random
+
+                # 获取目标位置
+                self.task_positions.append((self.item.x, self.item.y))
+                self.target_position = self.task_positions.pop(-1)
+            else:
+                pass
+
+    def get_random_item(self):
+        if len(self.items) > 0 and self.target_position == (0, 0):
+            # 随机获取一个物品的坐标
+            value = np.random.choice(list(self.items.values()))
+            # value = list(self.items.values())[0]
+            self.item_random = self.items.get((value.x, value.y))
+            self.item = self.item_random
+            # self.remove_item(item_random)
+            # 获取目标位置
+            self.task_positions.append((self.item.x, self.item.y))
+            self.target_position = self.task_positions.pop(-1)
 
     def step(self, action):
         print("---------------------------------------------------------------")
@@ -202,16 +236,7 @@ class WarehouseEnvironment:
                 done = False
                 self.target_position = self.task_positions.pop(0)
 
-            if len(self.items) > 0 and self.target_position == (0, 0):
-                # 随机获取一个物品的坐标
-                value = np.random.choice(list(self.items.values()))
-                # value = list(self.items.values())[0]
-                self.item_random = self.items.get((value.x, value.y))
-                self.item = self.item_random
-                # self.remove_item(item_random)
-                # 获取目标位置
-                self.task_positions.append((self.item.x, self.item.y))
-                self.target_position = self.task_positions.pop(-1)
+        self.get_earliest_item()
 
         # 执行动作并更新环境状态
         self.agent_move(action, move_x_distance, move_y_distance)
@@ -253,7 +278,6 @@ class WarehouseEnvironment:
                     self.item = self.item_random
                     self.remove_item(self.item_random)
                     self.agent = self.item
-
                     self.agent_has_item = True
 
             if len(self.agent.item_id) < 10:
@@ -270,6 +294,7 @@ class WarehouseEnvironment:
                 self.item_random = None
                 # self.reset()
                 if len(self.task_positions) == 0:
+                    reward += 1000
                     done = True  # 任务完成
             elif self.agent_has_item is True and len(self.task_positions) == 0:
                 self.prev_target_position = self.target_position
@@ -305,6 +330,7 @@ class WarehouseEnvironment:
 
                     # 执行随机选择的处理方式
                     random_action(other_item)
+                    self.conflict_count += 1
                     # self.handle_conflict_2(other_item)
                     reward -= 3000  # 冲突的惩罚
 
@@ -335,7 +361,8 @@ class WarehouseEnvironment:
 
     def save_records_to_csv(self):
         with open('simulation_records.csv', mode='w', newline='') as file:
-            fieldnames = ['action', 'agent_position', 'target_position', 'total_reward', 'elapsed_time']
+            fieldnames = ['action', 'agent_position', 'target_position', 'total_reward', 'elapsed_time',
+                          'conflict_count']
             writer = csv.DictWriter(file, fieldnames=fieldnames)
 
             writer.writeheader()
@@ -350,12 +377,10 @@ class WarehouseEnvironment:
 
         print("冲突解决1： 现在的agent携带的物品是  " + self.agent.item_id.strip('agent_'))
         print("冲突解决1： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
-        # self.target_position = self.task_positions.pop(-1)
-        # self.task_positions.append((75, interfering_item.y))
-        # self.task_positions.append((interfering_item.x, interfering_item.y))
-        # self.task_positions.append((75, interfering_item.y))
         print("任务位置有： ")
         print(self.task_positions)
+        self.task_positions.append((self.width, interfering_item.y))
+        self.target_position = self.task_positions.pop(-1)
 
     def handle_conflict_2(self, interfering_item):
         """
@@ -368,8 +393,12 @@ class WarehouseEnvironment:
 
         target_row = self.get_target_row(interfering_item)
 
-        self.task_positions.append((interfering_item.x, interfering_item.y))
-        self.task_positions.append((interfering_item.x, interfering_item.y + target_row))
+        self.task_positions.append((self.agent.x, self.agent.y))
+        flag = target_row - interfering_item.length
+        if flag > 0:
+            self.task_positions.append((interfering_item.x, interfering_item.y + target_row))
+        else:
+            self.task_positions.append((interfering_item.x, interfering_item.y - target_row))
 
         self.target_position = self.task_positions.pop(-1)
         print("任务位置有： ")
@@ -427,12 +456,12 @@ class WarehouseEnvironment:
             length = current_item.length
         index = self.segment_heights.index(length)
         upper_row = self.segment_heights[index - 1]
-        if not self.is_conflict_with_target(upper_row, current_item):
+        if not self.is_conflict_with_target(upper_row, current_item) and upper_row >= length:
             return upper_row
 
         # 检查移动到下面的行是否会发生冲突
         lower_row = self.segment_heights[index + 1]
-        if not self.is_conflict_with_target(lower_row, current_item):
+        if not self.is_conflict_with_target(lower_row, current_item) and lower_row >= length:
             return lower_row
 
         # 如果上面和下面的行都会发生冲突，则返回 None 表示没有可用行
