@@ -1,7 +1,6 @@
-import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.colors as mcolors
+import pandas as pd
 
 
 def analysis_csv(input_csv, output_csv):
@@ -92,6 +91,6 @@ def plot_task_analysis(dataframe):
 
 
 if __name__ == '__main__':
-    analysis_csv('simulation_records.csv', 'task_analysis_result.csv')
-    df = pd.read_csv('task_analysis_result.csv')
+    analysis_csv('simulation_records.csv', 'task_analysis_result_random.csv')
+    df = pd.read_csv('task_analysis_result_random.csv')
     plot_task_analysis(df)
