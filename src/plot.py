@@ -61,7 +61,7 @@ def plot_task_analysis(dataframe):
     ax.set_ylabel('Max_elapsed_time')
     ax.legend(fontsize='large', frameon=False)  # 显示图例，并调整字体大小和去除边框
 
-    # 2. 绘制平均奖励
+    # 2. 绘制平均开销时间
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.plot(dataframe.index.astype(int) + 1, dataframe['total_elapsed_time'] / dataframe['total_rows'], marker='o',
             linestyle='-',
@@ -84,7 +84,7 @@ def plot_task_analysis(dataframe):
     ax.set_ylabel('Max_conflict_count')
     ax.legend(fontsize='large', frameon=False)  # 显示图例，并调整字体大小和去除边框
 
-    # # 2. 绘制平均奖励
+    # # 2. 绘制平均冲突
     # fig, ax = plt.subplots(figsize=(10, 6))
     # ax.plot(dataframe.index.astype(int) + 1, dataframe['total_conflict_count'] / dataframe['total_rows'], marker='o',
     #         linestyle='-',

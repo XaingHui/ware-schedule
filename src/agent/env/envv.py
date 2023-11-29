@@ -15,11 +15,11 @@ class Item:
         self.item_id = item_id
         self.length = length  # 分段长
         self.width = width  # 分段宽
-        start_time = str(start_time).replace('-', '/').strip(' 00:00:00')
-        exit_time = str(exit_time).replace('-', '/').strip(' 00:00:00')
-        self.start_time = datetime.strptime(start_time, '%Y/%m/%d')  # 最早开工时间
+        # start_time = str(start_time).replace('-', '/').strip(' 00:00:00')
+        # exit_time = str(exit_time).replace('-', '/').strip(' 00:00:00')
+        self.start_time = start_time  # 最早开工时间
         self.processing_time = processing_time  # 加工周期
-        self.exit_time = datetime.strptime(exit_time, '%Y/%m/%d')  # 最早出场时间
+        self.exit_time = exit_time  # 最早出场时间
         self.x = x  # 物品的 x 坐标
         self.y = y  # 物品的 y 坐标
         self.color = color  # 可选：为物品添加颜色属性
@@ -81,7 +81,7 @@ class WarehouseEnvironment:
         start_time = self.start_time.second
         end_time = datetime.now().second
         hours = abs(int(end_time - start_time))
-        self.current_time += timedelta(minutes=hours * 3)
+        self.current_time += timedelta(days=hours * 0.1)
         print(self.current_time)
 
     def get_state(self):
@@ -123,16 +123,20 @@ class WarehouseEnvironment:
 
     def has_cache_item(self):
         if len(self.cache_items) > 0:
-            for i in range(len(self.cache_items)):
-                item = self.cache_items.pop(i)
-                start_time = str(item.start_time).replace('-', '/').strip(' 00:00:00')
-                exit_time = str(item.exit_time).replace('-', '/').strip(' 00:00:00')
-                if self.check_item(item.item_id, item.x, item.y, item.length, item.width, start_time,
-                                   item.processing_time, exit_time):
-                    break
-                else:
-                    break
+            print("len : " + str(len(self.cache_items)))
 
+            # 使用原始列表的副本进行迭代
+            for item in self.cache_items.copy():
+                # 在原始列表上进行删除操作
+                self.cache_items.remove(item)
+
+                # 处理每个item
+                # start_time = str(item.start_time).replace('-', '/').strip(' 00:00:00')
+                # exit_time = str(item.exit_time).replace('-', '/').strip(' 00:00:00')
+                self.check_item(item.item_id, item.x, item.y, item.length, item.width, item.start_time,
+                                item.processing_time, item.exit_time)
+        else:
+            print("列表为空。")
     def record_step(self, action, reward, done):
         step_info = {
             'action': action,
@@ -180,10 +184,9 @@ class WarehouseEnvironment:
             earliest_item = min(self.items.values(), key=operator.attrgetter('exit_time'))
             print("earliest_item: ", earliest_item.item_id, earliest_item.exit_time)
             print("current_time: ", self.current_time)
-            if earliest_item.exit_time <= self.current_time:
+            if datetime.strptime(earliest_item.exit_time, "%Y/%m/%d") <= self.current_time:
                 # 设置抽取的物品
-                self.item_random = earliest_item
-                self.item = self.item_random
+                self.item = earliest_item
 
                 # 获取目标位置
                 self.task_positions.append((self.item.x, self.item.y))
@@ -202,6 +205,44 @@ class WarehouseEnvironment:
             # 获取目标位置
             self.task_positions.append((self.item.x, self.item.y))
             self.target_position = self.task_positions.pop(-1)
+
+    def arrive_interfering_position(self):
+        print("现在干涉物品的长度：  " + str(len(self.interfering_items)))
+        if len(self.interfering_items) != 0 and self.agent_has_item is False and self.target_position[0] < 75:
+            item = self.interfering_items[-1]
+            print("干扰物品的是：", item.item_id)
+            print("干扰物品的位置：", item.x, item.y)
+            print("机器人到达要添加物品的位置：", item.x, item.y)
+            item = self.interfering_items.pop(-1)
+            start_time = str(item.start_time).replace('-', '/').strip(' 00:00:00')
+            exit_time = str(item.exit_time).replace('-', '/').strip(' 00:00:00')
+            self.check_item(item.item_id, item.x, item.y, item.length, item.width, start_time,
+                            item.processing_time,
+                            exit_time)
+
+    def conflict_resolve(self, reward):
+        # 在代理机器人移动过程中检测冲突
+        print("代理机器人的状态： ", self.agent.item_id, self.agent.x, self.agent.y)
+        print("是否携带物品：", self.agent_has_item)
+        if self.agent_has_item is True:
+            for other_item in list(self.items.values()):
+                if other_item.item_id.strip('agent_') != self.agent.item_id.strip(
+                        'agent_') and self.check_collision(self.agent, other_item):
+                    # 处理冲突
+                    print(
+                        f"冲突发生：代理机器人携带的物品与其他物品冲突  " + other_item.item_id.strip(
+                            'agent_') + "     " +
+                        self.agent.item_id.strip('agent_'))
+
+                    # 随机选择一种处理方式
+                    random_action = choice(
+                        [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
+
+                    # 执行随机选择的处理方式
+                    random_action(other_item)
+                    self.conflict_count += 1
+                    # self.handle_conflict_2(other_item)
+                    reward -= 3000  # 冲突的惩罚
 
     def step(self, action):
         print("---------------------------------------------------------------")
@@ -224,7 +265,7 @@ class WarehouseEnvironment:
 
         if self.target_position == (0, 0):
             if len(self.items) == 0 and len(self.cache_items) == 0:
-                if len(self.task_positions) == 0:
+                if len(self.task_positions) == 0 and len(self.interfering_items) == 0:
                     done = True
                     reward = 10000
                     new_state = self.get_state()
@@ -253,20 +294,11 @@ class WarehouseEnvironment:
             reward -= 100
 
         if self.agent_position == self.target_position:
-            print("现在干涉物品的长度：  " + str(len(self.interfering_items)))
-            if len(self.interfering_items) != 0 and self.agent_has_item is False and self.target_position[0] < 75:
-                item = self.interfering_items[-1]
-                print("干扰物品的是：", item.item_id)
-                print("干扰物品的位置：", item.x, item.y)
-                print("机器人到达要添加物品的位置：", item.x, item.y)
-                item = self.interfering_items.pop(-1)
-                start_time = str(item.start_time).replace('-', '/').strip(' 00:00:00')
-                exit_time = str(item.exit_time).replace('-', '/').strip(' 00:00:00')
-                self.check_item(item.item_id, item.x, item.y, item.length, item.width, start_time,
-                                item.processing_time,
-                                exit_time)
+            # 机器人是否到达了要添加干涉物品的位置，如果是 就添加
+            self.arrive_interfering_position()
             # 代理机器人到达目标位置
             if self.target_position[0] < 75 and self.target_position != (0, 0):
+                # 拿到的物品是否为空，如果为空，代表需要从场地捡一个物品携带
                 if self.item_random is None:
                     item = self.items.get((self.target_position[0], self.target_position[1]))
                     print("目标物品的是：", item.item_id)
@@ -283,6 +315,7 @@ class WarehouseEnvironment:
             if len(self.agent.item_id) < 10:
                 self.agent.item_id = 'agent_' + str(self.item.item_id)
             self.agent.color = 'red'
+
             reward += 100  # 到达目标位置的奖励
             if self.target_position[0] >= 75:
                 self.item = self.getInitItem()
@@ -292,47 +325,32 @@ class WarehouseEnvironment:
                 self.task_positions.append((0, 0))
                 self.target_position = self.task_positions.pop(-1)
                 self.item_random = None
-                # self.reset()
-                if len(self.task_positions) == 0:
+                # 如果任务列表是空，干涉物品也是空代表完成任务。
+                if len(self.task_positions) == 0 and \
+                        len(self.interfering_items) == 0:
                     reward += 1000
                     done = True  # 任务完成
+
+            # 如果机器人携带物品，并且任务位置列表是空，那就把目标位置设置为搬出
             elif self.agent_has_item is True and len(self.task_positions) == 0:
                 self.prev_target_position = self.target_position
                 self.task_positions.append((self.width, self.agent.y))
                 self.target_position = self.task_positions.pop(-1)
                 done = False
+            # 如果机器人携带物品，但是任务位置列表不空，目标位置为任务列表最后一个。机器人放下携带物品，并初始化。
+            # 并且把携带物品加到环境中
             elif self.agent_has_item is True and len(self.task_positions) != 0:
                 self.prev_target_position = self.target_position
                 self.target_position = self.task_positions.pop(-1)
                 self.agent_has_item = False
                 self.items.update({(self.agent.x, self.agent.y): self.agent})
-                self.agent = self.getInitItem()
+                self.item = self.getInitItem()
+                self.agent = self.item
                 done = False
         else:
             done = False
 
-        # 在代理机器人移动过程中检测冲突
-        print("代理机器人的状态： ", self.agent.item_id, self.agent.x, self.agent.y)
-        print("是否携带物品：", self.agent_has_item)
-        if self.agent_has_item is True:
-            for other_item in list(self.items.values()):
-                if other_item.item_id.strip('agent_') != self.agent.item_id.strip(
-                        'agent_') and self.check_collision(self.agent, other_item):
-                    # 处理冲突
-                    print(
-                        f"冲突发生：代理机器人携带的物品与其他物品冲突  " + other_item.item_id.strip(
-                            'agent_') + "     " +
-                        self.agent.item_id.strip('agent_'))
-
-                    # 随机选择一种处理方式
-                    random_action = choice(
-                        [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
-
-                    # 执行随机选择的处理方式
-                    random_action(other_item)
-                    self.conflict_count += 1
-                    # self.handle_conflict_2(other_item)
-                    reward -= 3000  # 冲突的惩罚
+        self.conflict_resolve(reward)
 
         if len(self.task_positions) > 0:
             print("任务位置的长度是：", len(self.task_positions))
@@ -346,6 +364,7 @@ class WarehouseEnvironment:
         # 更新环境
         if self.target_position == (0, 0):
             reward = 0
+
         self.simulate_time_passage()
         # 更新状态
         new_state = self.get_state()
@@ -512,7 +531,9 @@ class WarehouseEnvironment:
             # 如果空地上的物品数量已经达到限制，你可以采取适当的操作，例如引发异常
             raise ValueError("空地上的物品数量已经达到限制")
         item_color = self.colors[len(self.items) % len(self.colors)]
+
         item = Item(item_id, x, y, length, width, start_time, processing_time, exit_time, item_color)
+        # print("add 方法中添加物品：  id ： " + item.item_id + "   " + item.start_time.__str__())
         return item
 
     # 在 remove_item 方法中添加如下行
@@ -536,8 +557,10 @@ class WarehouseEnvironment:
         - 无返回值
         """
         item = self.add_item(item_id, x, y, length, width, start_time, processing_time, exit_time)
-
-        if self.current_time >= item.start_time:
+        # print(item_id + "  " + item.start_time.__str__())
+        if self.current_time >= datetime.strptime(item.start_time, "%Y/%m/%d"):
+            # print("添加物品时当前时间 :" + self.current_time.__str__())
+            # print("进入物品的开始时间和 id:" + item.item_id + "   " + item.start_time.__str__())
             # 检查相同 y 坐标的物品
             com_y_items = self.filter_item_by_y(item.y)
             com_y_items.sort(key=lambda x: x.exit_time, reverse=True)
@@ -552,11 +575,12 @@ class WarehouseEnvironment:
 
             size = item.length * item.width
             self.items[(item.x, item.y)] = item
-            return True
         else:
-            if item not in self.cache_items:
+            if len(self.cache_items) == 0:
                 self.cache_items.append(item)
-            return False
+            else:
+                if item not in self.cache_items:
+                    self.cache_items.append(item)
 
     def filter_item_by_y(self, y):
         """

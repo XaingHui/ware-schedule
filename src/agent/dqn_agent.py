@@ -2,9 +2,9 @@ import csv
 
 import numpy as np
 import tensorflow
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.optimizers import Adam
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.optimizers import Adam
 from collections import deque
 import random
 
