@@ -81,7 +81,7 @@ class WarehouseEnvironment:
         start_time = self.start_time.second
         end_time = datetime.now().second
         hours = abs(int(end_time - start_time))
-        self.current_time += timedelta(days=hours * 0.1)
+        self.current_time += timedelta(minutes=hours * 0.1)
         print(self.current_time)
 
     def get_state(self):
@@ -181,7 +181,7 @@ class WarehouseEnvironment:
     def get_earliest_item(self):
         if len(self.items) > 0 and self.target_position == (0, 0):
             # 获取最早出场时间的物品
-            earliest_item = min(self.items.values(), key=operator.attrgetter('exit_time'))
+            earliest_item = min(self.items.values(), key=lambda x: datetime.strptime(x.exit_time, "%Y/%m/%d"))
             print("earliest_item: ", earliest_item.item_id, earliest_item.exit_time)
             print("current_time: ", self.current_time)
             if datetime.strptime(earliest_item.exit_time, "%Y/%m/%d") <= self.current_time:
