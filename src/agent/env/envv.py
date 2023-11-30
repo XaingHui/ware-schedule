@@ -1,3 +1,4 @@
+import copy
 import csv
 import operator
 import time
@@ -46,7 +47,6 @@ class Item:
 
 class WarehouseEnvironment:
     def __init__(self, width, height, number, time='2017/9/1'):
-        self.prev_target_position = (0, 0)
         self.width = width
         self.height = height
         self.number = number
@@ -186,9 +186,9 @@ class WarehouseEnvironment:
             print("current_time: ", self.current_time)
             if datetime.strptime(earliest_item.exit_time, "%Y/%m/%d") <= self.current_time:
                 # 设置抽取的物品
-                self.item_random = earliest_item
-                self.item = self.item_random
-
+                # self.item_random = earliest_item
+                # self.item = self.item_random
+                self.item = earliest_item
                 # 获取目标位置
                 self.task_positions.append((self.item.x, self.item.y))
                 self.target_position = self.task_positions.pop(-1)
@@ -208,8 +208,8 @@ class WarehouseEnvironment:
             self.target_position = self.task_positions.pop(-1)
 
     def arrive_interfering_position(self):
-        print("现在干涉物品的长度：  " + str(len(self.interfering_items)))
-        if len(self.interfering_items) != 0 and self.agent_has_item is False and self.target_position[0] < 75:
+        if len(self.interfering_items) != 0 and self.agent_has_item is False and self.target_position ==  \
+                (self.interfering_items[-1].x, self.interfering_items[-1].y):
             item = self.interfering_items[-1]
             print("干扰物品的是：", item.item_id)
             print("干扰物品的位置：", item.x, item.y)
@@ -246,6 +246,7 @@ class WarehouseEnvironment:
 
     def step(self, action):
         print("---------------------------------------------------------------")
+        print("现在干涉物品的长度：  " + str(len(self.interfering_items)))
         print("现在的物品有:")
         for k, v in self.items.items():
             print(k, v.item_id)
@@ -264,6 +265,8 @@ class WarehouseEnvironment:
         reward = 0
 
         if self.target_position == (0, 0):
+            if len(self.task_positions) != 0:
+                self.target_position = self.task_positions.pop(-1)
             if len(self.items) == 0 and len(self.cache_items) == 0:
                 if len(self.task_positions) == 0 and len(self.interfering_items) == 0:
                     done = True
@@ -303,8 +306,13 @@ class WarehouseEnvironment:
                     item = self.items.get((self.target_position[0], self.target_position[1]))
                     print("目标物品的是：", item.item_id)
                     self.item = item
-                    self.remove_item(item)
+                    print("目标物品的是：", self.item.item_id)
                     self.agent = self.item
+                    print("目标物品的是：", self.agent.item_id)
+                    self.agent.x = self.agent_position[0]
+                    self.agent.y = self.agent_position[1]
+                    self.remove_item(item)
+                    print("目标物品的是-----------：", self.agent.item_id)
                     self.agent_has_item = True
                 else:
                     self.item = self.item_random
@@ -332,21 +340,20 @@ class WarehouseEnvironment:
                     done = True  # 任务完成
 
             # 如果机器人携带物品，并且任务位置列表是空，那就把目标位置设置为搬出
-            elif self.agent_has_item is True and len(self.task_positions) == 0:
-                self.prev_target_position = self.target_position
+            elif self.agent_has_item is True and len(self.task_positions) == 1:
                 self.task_positions.append((self.width, self.agent.y))
                 self.target_position = self.task_positions.pop(-1)
                 done = False
             # 如果机器人携带物品，但是任务位置列表不空，目标位置为任务列表最后一个。机器人放下携带物品，并初始化。
             # 并且把携带物品加到环境中
-            elif self.agent_has_item is True and len(self.task_positions) != 0:
-                self.prev_target_position = self.target_position
-                self.target_position = self.task_positions.pop(-1)
-                self.agent_has_item = False
-                self.items.update({(self.agent.x, self.agent.y): self.agent})
-                self.item = self.getInitItem()
-                self.agent = self.item
-                done = False
+            # elif self.agent_has_item is True and len(self.task_positions) != 1:
+            #     self.prev_target_position = self.target_position
+            #     self.target_position = self.task_positions.pop(-1)
+            #     self.agent_has_item = False
+            #     self.items.update({(self.agent.x, self.agent.y): self.agent})
+            #     self.item = self.getInitItem()
+            #     self.agent = self.item
+            #     done = False
         else:
             done = False
 
@@ -447,10 +454,14 @@ class WarehouseEnvironment:
         self.task_positions.append((interfering_item.x, interfering_item.y))
         self.agent.item_id = self.agent.item_id.strip('agent_')
         self.items.update({(self.agent.x, self.agent.y): self.agent})
-        for item in self.interfering_items:
-            if interfering_item.id != item.item_id:
-                self.interfering_items.append(interfering_item)
-                break
+        if len(self.interfering_items) == 0:
+            tmp_interfering_item = copy.copy(interfering_item)
+            self.interfering_items.append(tmp_interfering_item)
+        else:
+            for item in self.interfering_items:
+                if interfering_item.id != item.item_id:
+                    self.interfering_items.append(interfering_item)
+                    break
         self.remove_item(interfering_item)
         print("干扰物品位置： " + str(interfering_item.x), str(interfering_item.y))
 
@@ -512,7 +523,6 @@ class WarehouseEnvironment:
     def reset(self):
         # Reset the environment to its initial state
         state = self.initial_state  # Reset the state to the initial state
-        self.prev_target_position = (0, 0)
         self.agent = Item('agent', 0, 0, 5, 5, '2017/9/1', 0, '2017/9/1', 'black')
         self.agent_position = self.agent.x, self.agent.y
         self.target_position = (0, 0)  # 目标位置
