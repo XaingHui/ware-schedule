@@ -81,7 +81,7 @@ class WarehouseEnvironment:
         start_time = self.start_time.second
         end_time = datetime.now().second
         hours = abs(int(end_time - start_time))
-        self.current_time += timedelta(minutes=hours * 0.1)
+        self.current_time += timedelta(minutes=hours * 5)
         print(self.current_time)
 
     def get_state(self):
@@ -187,6 +187,7 @@ class WarehouseEnvironment:
             if datetime.strptime(earliest_item.exit_time, "%Y/%m/%d") <= self.current_time:
                 # 设置抽取的物品
                 self.item = earliest_item
+                self.item_random = earliest_item
 
                 # 获取目标位置
                 self.task_positions.append((self.item.x, self.item.y))
