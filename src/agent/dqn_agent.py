@@ -122,14 +122,14 @@ def add_items_from_csv(env, csv_file):
 
 
 def main():
-    env = WarehouseEnvironment(width=75, height=153, number=50, time='2017/9/2')
+    env = WarehouseEnvironment(width=75, height=153, number=50, time='2017/9/22')
     # # 示例用法：添加物品并显示环境
     # env.check_item('B001', 0, 114, 8, 5, '2017/9/1', 13, '2017/9/2')
     # env.check_item('B003', 20, 0, 8, 5, '2017/9/1', 13, '2017/9/3')
     # # # env.check_item('B007', , 114, 11, 8, '2017/9/2', 13, '2017/9/29')
     # env.check_item('B009', 10, 127, 8, 5, '2017/9/1', 13, '2017/9/4')
     # env.check_item('B0011', 0, 114, 8, 5, '2017/9/1', 13, '2017/9/5')
-    print(env.current_time)
+
     add_items_from_csv(env, '../data_test.csv')
     env.render()
     state_size = len(env.get_state())
@@ -143,7 +143,7 @@ def main():
         agent_position = np.array(list(state['agent_position']))
         target_position = np.array(list(state['target_positions']))
         # item_positions = np.array(list(state['item_positions']))
-        print(env.current_time)
+
         # 将这些位置信息合并成一个数组
         state_array = np.concatenate([agent_position, target_position])
         #  print(state_array)
@@ -154,7 +154,6 @@ def main():
         count = 5
         while not done:
             action = agent.choose_action(state, agent_position, target_position, count)
-            print("action:", action)
             next_state, reward, done, _ = env.step(action)
             print(next_state)
             agent_position = np.array(list(next_state['agent_position']))

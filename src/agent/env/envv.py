@@ -62,7 +62,7 @@ class WarehouseEnvironment:
         self.agent_has_item = False
         self.total_reward = 0
         self.total_step_time = 0
-        self.item = Item('tmp', self.agent.x, self.agent.y, 5, 5, '2017/9/1', 0, '2017/9/1', 'black')
+        self.item = Item('agent', self.agent.x, self.agent.y, 5, 5, time, 0, time, 'black')
         self.task_positions = []
         self.conflict_count = 0
         self.item_random = None
@@ -81,7 +81,7 @@ class WarehouseEnvironment:
         start_time = self.start_time.second
         end_time = datetime.now().second
         hours = abs(int(end_time - start_time))
-        self.current_time += timedelta(minutes=hours * 5)
+        self.current_time += timedelta(minutes=hours * 1)
         print(self.current_time)
 
     def get_state(self):
@@ -186,8 +186,8 @@ class WarehouseEnvironment:
             print("current_time: ", self.current_time)
             if datetime.strptime(earliest_item.exit_time, "%Y/%m/%d") <= self.current_time:
                 # 设置抽取的物品
-                self.item = earliest_item
                 self.item_random = earliest_item
+                self.item = self.item_random
 
                 # 获取目标位置
                 self.task_positions.append((self.item.x, self.item.y))
@@ -215,11 +215,9 @@ class WarehouseEnvironment:
             print("干扰物品的位置：", item.x, item.y)
             print("机器人到达要添加物品的位置：", item.x, item.y)
             item = self.interfering_items.pop(-1)
-            start_time = str(item.start_time).replace('-', '/').strip(' 00:00:00')
-            exit_time = str(item.exit_time).replace('-', '/').strip(' 00:00:00')
-            self.check_item(item.item_id, item.x, item.y, item.length, item.width, start_time,
+            self.check_item(item.item_id, item.x, item.y, item.length, item.width, item.start_time,
                             item.processing_time,
-                            exit_time)
+                            item.exit_time)
 
     def conflict_resolve(self, reward):
         # 在代理机器人移动过程中检测冲突
@@ -235,15 +233,16 @@ class WarehouseEnvironment:
                             'agent_') + "     " +
                         self.agent.item_id.strip('agent_'))
 
-                    # 随机选择一种处理方式
-                    random_action = choice(
-                        [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
+                    # # 随机选择一种处理方式
+                    # random_action = choice(
+                    #     [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
+                    #
+                    # # 执行随机选择的处理方式
+                    # random_action(other_item)
 
-                    # 执行随机选择的处理方式
-                    random_action(other_item)
-                    self.conflict_count += 1
-                    # self.handle_conflict_2(other_item)
-                    reward -= 3000  # 冲突的惩罚
+                    self.handle_conflict_1(other_item)
+                    reward -= 5000  # 冲突的惩罚
+        return reward
 
     def step(self, action):
         print("---------------------------------------------------------------")
@@ -351,7 +350,7 @@ class WarehouseEnvironment:
         else:
             done = False
 
-        self.conflict_resolve(reward)
+        reward = self.conflict_resolve(reward)
 
         if len(self.task_positions) > 0:
             print("任务位置的长度是：", len(self.task_positions))
@@ -393,6 +392,7 @@ class WarehouseEnvironment:
         """
         处理冲突的方式1：重新放置干涉方块
         """
+        self.conflict_count += 2
         self.exchange_agent_item(interfering_item)
 
         print("冲突解决1： 现在的agent携带的物品是  " + self.agent.item_id.strip('agent_'))
@@ -406,7 +406,7 @@ class WarehouseEnvironment:
         """
         处理冲突的方式2：移动至相邻的上下行
         """
-
+        self.conflict_count += 1
         self.exchange_agent_item(interfering_item)
         print("冲突解决2： 现在的agent携带的物品是  " + self.agent.item_id.strip('agent_'))
         print("冲突解决2： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
@@ -684,7 +684,7 @@ class WarehouseEnvironment:
                 return item
 
     def getInitItem(self):
-        init_item = Item('tmp', self.agent.x, self.agent.y, 5, 5, '2017/9/1', 0, '2017/9/1', 'black')
+        init_item = Item('agent', self.agent.x, self.agent.y, 5, 5, '2017/9/1', 0, '2017/9/1', 'black')
         return init_item
 
 
