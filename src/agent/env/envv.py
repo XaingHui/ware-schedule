@@ -137,6 +137,7 @@ class WarehouseEnvironment:
                                 item.processing_time, item.exit_time)
         else:
             print("列表为空。")
+
     def record_step(self, action, reward, done):
         step_info = {
             'action': action,
@@ -208,7 +209,7 @@ class WarehouseEnvironment:
             self.target_position = self.task_positions.pop(-1)
 
     def arrive_interfering_position(self):
-        if len(self.interfering_items) != 0 and self.agent_has_item is False and self.target_position ==  \
+        if len(self.interfering_items) != 0 and self.agent_has_item is False and self.target_position == \
                 (self.interfering_items[-1].x, self.interfering_items[-1].y):
             item = self.interfering_items[-1]
             print("干扰物品的是：", item.item_id)
@@ -234,11 +235,11 @@ class WarehouseEnvironment:
                         self.agent.item_id.strip('agent_'))
 
                     # # 随机选择一种处理方式
-                    # random_action = choice(
-                    #     [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
-                    #
-                    # # 执行随机选择的处理方式
-                    # random_action(other_item)
+                    random_action = choice(
+                        [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
+
+                    # 执行随机选择的处理方式
+                    random_action(other_item)
 
                     self.handle_conflict_1(other_item)
                     reward -= 5000  # 冲突的惩罚
@@ -265,8 +266,6 @@ class WarehouseEnvironment:
         reward = 0
 
         if self.target_position == (0, 0):
-            if len(self.task_positions) != 0:
-                self.target_position = self.task_positions.pop(-1)
             if len(self.items) == 0 and len(self.cache_items) == 0:
                 if len(self.task_positions) == 0 and len(self.interfering_items) == 0:
                     done = True
@@ -302,17 +301,13 @@ class WarehouseEnvironment:
             # 代理机器人到达目标位置
             if self.target_position[0] < 75 and self.target_position != (0, 0):
                 # 拿到的物品是否为空，如果为空，代表需要从场地捡一个物品携带
-                if self.item_random is None:
+                if self.item_random is None and self.agent_has_item is False:
                     item = self.items.get((self.target_position[0], self.target_position[1]))
-                    print("目标物品的是：", item.item_id)
                     self.item = item
-                    print("目标物品的是：", self.item.item_id)
                     self.agent = self.item
-                    print("目标物品的是：", self.agent.item_id)
                     self.agent.x = self.agent_position[0]
                     self.agent.y = self.agent_position[1]
                     self.remove_item(item)
-                    print("目标物品的是-----------：", self.agent.item_id)
                     self.agent_has_item = True
                 else:
                     self.item = self.item_random
@@ -340,7 +335,7 @@ class WarehouseEnvironment:
                     done = True  # 任务完成
 
             # 如果机器人携带物品，并且任务位置列表是空，那就把目标位置设置为搬出
-            elif self.agent_has_item is True and len(self.task_positions) == 1:
+            elif self.agent_has_item is True and len(self.task_positions) != 0:
                 self.task_positions.append((self.width, self.agent.y))
                 self.target_position = self.task_positions.pop(-1)
                 done = False
@@ -459,7 +454,7 @@ class WarehouseEnvironment:
             self.interfering_items.append(tmp_interfering_item)
         else:
             for item in self.interfering_items:
-                if interfering_item.id != item.item_id:
+                if interfering_item.item_id != item.item_id:
                     self.interfering_items.append(interfering_item)
                     break
         self.remove_item(interfering_item)
