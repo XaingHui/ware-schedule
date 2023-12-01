@@ -211,14 +211,17 @@ class WarehouseEnvironment:
     def arrive_interfering_position(self):
         if len(self.interfering_items) != 0 and self.agent_has_item is False and self.target_position == \
                 (self.interfering_items[-1].x, self.interfering_items[-1].y):
-            item = self.interfering_items[-1]
+            item = self.interfering_items.pop(-1)
             print("干扰物品的是：", item.item_id)
             print("干扰物品的位置：", item.x, item.y)
             print("机器人到达要添加物品的位置：", item.x, item.y)
-            item = self.interfering_items.pop(-1)
-            self.check_item(item.item_id, item.x, item.y, item.length, item.width, item.start_time,
+            self.check_item(item.item_id, 0, item.y, item.length, item.width, item.start_time,
                             item.processing_time,
                             item.exit_time)
+            self.agent_has_item = False
+            self.item = self.getInitItem()
+            self.agent = self.item
+
 
     def conflict_resolve(self, reward):
         # 在代理机器人移动过程中检测冲突
@@ -298,6 +301,24 @@ class WarehouseEnvironment:
         if self.agent_position == self.target_position:
             # 机器人是否到达了要添加干涉物品的位置，如果是 就添加
             self.arrive_interfering_position()
+            if len(self.interfering_items) == 0 and self.agent == self.item\
+                    and self.agent_has_item is False and self.target_position != (0, 0):
+                print("---------------------------任务完成-------------------------")
+                done = True
+                new_state = self.get_state()
+                reward += 1000
+                self.target_position = (0, 0)
+                self.task_positions.pop(0)
+                return new_state, reward, done, {}  # 代理机器人到达目标位置，任务完成
+
+            # # 如果任务列表是空，干涉物品也是空代表完成任务。
+            # if len(self.task_positions) == 0 and len(self.interfering_items) == 0\
+            #         and self.agent_has_item is False and self.agent is None\
+            #         and self.task_positions[-1] == (0, 0):
+            #     print("任务完成！")
+            #     reward += 1000
+            #     done = True  # 任务完成
+            #     return self.get_state(), reward, done, {}
             # 代理机器人到达目标位置
             if self.target_position[0] < 75 and self.target_position != (0, 0):
                 # 拿到的物品是否为空，如果为空，代表需要从场地捡一个物品携带
@@ -305,19 +326,13 @@ class WarehouseEnvironment:
                     item = self.items.get((self.target_position[0], self.target_position[1]))
                     self.item = item
                     self.agent = self.item
-                    self.agent.x = self.agent_position[0]
-                    self.agent.y = self.agent_position[1]
-                    self.remove_item(item)
-                    self.agent_has_item = True
+                    if self.remove_item(item):
+                        self.agent_has_item = True
                 else:
                     self.item = self.item_random
                     self.remove_item(self.item_random)
                     self.agent = self.item
                     self.agent_has_item = True
-
-            if len(self.agent.item_id) < 10:
-                self.agent.item_id = 'agent_' + str(self.item.item_id)
-            self.agent.color = 'red'
 
             reward += 100  # 到达目标位置的奖励
             if self.target_position[0] >= 75:
@@ -328,17 +343,16 @@ class WarehouseEnvironment:
                 self.task_positions.append((0, 0))
                 self.target_position = self.task_positions.pop(-1)
                 self.item_random = None
-                # 如果任务列表是空，干涉物品也是空代表完成任务。
-                if len(self.task_positions) == 0 and \
-                        len(self.interfering_items) == 0:
-                    reward += 1000
-                    done = True  # 任务完成
 
             # 如果机器人携带物品，并且任务位置列表是空，那就把目标位置设置为搬出
             elif self.agent_has_item is True and len(self.task_positions) != 0:
                 self.task_positions.append((self.width, self.agent.y))
                 self.target_position = self.task_positions.pop(-1)
                 done = False
+
+            if len(self.agent.item_id) < 10:
+                self.agent.item_id = 'agent_' + str(self.item.item_id)
+            self.agent.color = 'red'
             # 如果机器人携带物品，但是任务位置列表不空，目标位置为任务列表最后一个。机器人放下携带物品，并初始化。
             # 并且把携带物品加到环境中
             # elif self.agent_has_item is True and len(self.task_positions) != 1:
@@ -547,8 +561,11 @@ class WarehouseEnvironment:
         """
         从场地中移除物品
         """
+        if item is None:
+            return False
         position = (item.x, item.y)
         del self.items[position]
+        return True
 
     def check_item(self, item_id, x, y, length, width, start_time, processing_time, exit_time):
         """
