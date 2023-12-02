@@ -237,13 +237,13 @@ class WarehouseEnvironment:
                         self.agent.item_id.strip('agent_'))
 
                     # # 随机选择一种处理方式
-                    # random_action = choice(
-                    #     [self.handle_conflict_1, self.handle_conflict_3])
-                    #
-                    # # 执行随机选择的处理方式
-                    # random_action(other_item)
+                    random_action = choice(
+                        [self.handle_conflict_1, self.handle_conflict_3])
 
-                    self.handle_conflict_3(other_item)
+                    # 执行随机选择的处理方式
+                    random_action(other_item)
+
+                    # self.handle_conflict_3(other_item)
                     reward -= 5000  # 冲突的惩罚
         return reward
 
