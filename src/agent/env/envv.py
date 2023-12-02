@@ -631,7 +631,7 @@ class WarehouseEnvironment:
         """
         rectangle1 = item1.get_rectangle()
         rectangle2 = item2.get_rectangle()
-        if not (rectangle1[2] - epsilon < rectangle2[0] or  # 左
+        if not (rectangle1[2] + epsilon < rectangle2[0] or  # 左
                 rectangle1[0] + epsilon > rectangle2[2] or  # 右
                 rectangle1[3] + epsilon < rectangle2[1] or  # 上
                 rectangle1[1] - epsilon > rectangle2[3]):
