@@ -58,7 +58,6 @@ class DQNAgent:
     #         else:
     #             return 0 if q_values[0] > q_values[1] else 1  # 上移或下移
 
-
     def choose_action(self, state, agent_position, target_position, count):
         if np.random.rand() <= self.epsilon and count > 0:
             return np.random.choice(self.action_size)
@@ -80,6 +79,7 @@ class DQNAgent:
                 return 1  # 下移
             else:
                 return 0  # 上移
+
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
 
