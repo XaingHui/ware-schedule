@@ -237,13 +237,13 @@ class WarehouseEnvironment:
                         self.agent.item_id.strip('agent_'))
 
                     # # 随机选择一种处理方式
-                    random_action = choice(
-                        [self.handle_conflict_1, self.handle_conflict_3])
+                    # random_action = choice(
+                    #     [self.handle_conflict_1, self.handle_conflict_3])
+                    #
+                    # # 执行随机选择的处理方式
+                    # random_action(other_item)
 
-                    # 执行随机选择的处理方式
-                    random_action(other_item)
-
-                    # self.handle_conflict_3(other_item)
+                    self.handle_conflict_3(other_item)
                     reward -= 5000  # 冲突的惩罚
         return reward
 
@@ -367,6 +367,8 @@ class WarehouseEnvironment:
                 and self.agent.y == self.target_position[1]:
             self.target_position = self.task_positions.pop(-1)
 
+
+
         # 更新环境
         if self.target_position == (0, 0):
             reward = 0
@@ -413,31 +415,28 @@ class WarehouseEnvironment:
         处理冲突的方式2：移动至相邻的上下行
         """
         self.conflict_count += 1
-        self.exchange_agent_item(interfering_item)
+        self.agent.color = 'red'
         print("冲突解决2： 现在的agent携带的物品是  " + self.agent.item_id.strip('agent_'))
         print("冲突解决2： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
 
         target_row = self.get_target_row(interfering_item)
-        if target_row is None:
-            self.handle_conflict_3(interfering_item)
-        else:
-            self.task_positions.append((self.agent.x, self.agent.y))
-            flag = target_row - interfering_item.length
-            if flag > 0:
-                self.task_positions.append((interfering_item.x, interfering_item.y + target_row))
-            else:
-                self.task_positions.append((interfering_item.x, interfering_item.y - target_row))
 
+        if target_row is not None:
+            # 移动干涉方块至相邻的上下行中
+            self.move_to_target_row(interfering_item, target_row)
+            self.task_positions.append((self.width, self.item.y))
             self.target_position = self.task_positions.pop(-1)
-            print("任务位置有： ")
-            print(self.task_positions)
-
+        else:
+            self.handle_conflict_3(interfering_item)
         # 待目标方块搬出后，不将这些干涉方块放回原所在行
 
     def handle_conflict_3(self, interfering_item):
         """
         处理冲突的方式3：直接从邻行搬出
         """
+        self.items.update({(self.agent.x, self.agent.y): self.agent})
+
+
         self.agent.color = 'red'
         print("冲突解决3： 现在的agent携带的物品是  " + self.agent.item_id.strip('agent_'))
         print("冲突解决3： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
@@ -446,14 +445,26 @@ class WarehouseEnvironment:
 
         if target_row is not None:
             # 移动干涉方块至相邻的上下行中
-            self.move_to_target_row(interfering_item, target_row)
-            self.task_positions.append((self.width, self.item.y + target_row))
+            self.move_to_target_row(self.item, target_row)
+            # 获取最后一个键（key）
+            last_key = list(self.items.keys())[-1]
+
+            # 获取最后一个物品
+            last_item = self.items[last_key]
+            self.item = last_item
+            self.items.pop(last_key)
+            self.agent = self.item
+            self.task_positions.append((self.width, self.item.y - target_row))
             self.target_position = self.task_positions.pop(-1)
 
     def move_to_target_row(self, item, target_row):
         self.remove_item(item)
         self.agent = self.item
-        self.items.update({(self.item.x, self.item.y + target_row): item})
+        if self.agent.length - target_row < 0:
+            self.items.update({(self.item.x, self.item.y - target_row): item})
+        else:
+            self.items.update({(self.item.x, self.item.y + target_row): item})
+
 
     def exchange_agent_item(self, interfering_item):
         """
@@ -496,11 +507,13 @@ class WarehouseEnvironment:
             length = current_item.length
         index = self.segment_heights.index(length)
         upper_row = self.segment_heights[index - 1]
+        print("upper_row: " + str(upper_row))
         if not self.is_conflict_with_target(upper_row, current_item) and upper_row >= length:
             return upper_row
 
         # 检查移动到下面的行是否会发生冲突
         lower_row = self.segment_heights[index + 1]
+        print("lower_row: " + str(lower_row))
         if not self.is_conflict_with_target(lower_row, current_item) and lower_row >= length:
             return lower_row
 
