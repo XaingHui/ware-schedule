@@ -238,7 +238,7 @@ class WarehouseEnvironment:
 
                     # 随机选择一种处理方式
                     random_action = choice(
-                        [self.handle_conflict_1, self.handle_conflict_3])
+                        [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
 
                     # 执行随机选择的处理方式
                     random_action(other_item)
