@@ -81,7 +81,7 @@ class WarehouseEnvironment:
         start_time = self.start_time.second
         end_time = datetime.now().second
         hours = abs(int(end_time - start_time))
-        self.current_time += timedelta(minutes=hours * 1)
+        self.current_time += timedelta(minutes=hours * 0.8)
         print(self.current_time)
 
     def get_state(self):
@@ -237,12 +237,12 @@ class WarehouseEnvironment:
                             'agent_') + "     " +
                         self.agent.item_id.strip('agent_'))
 
-                    # # 随机选择一种处理方式
-                    random_action = choice(
-                        [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
-
-                    # 执行随机选择的处理方式
-                    random_action(other_item)
+                    # # # 随机选择一种处理方式
+                    # random_action = choice(
+                    #     [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
+                    #
+                    # # 执行随机选择的处理方式
+                    # random_action(other_item)
 
                     self.handle_conflict_1(other_item)
                     reward -= 5000  # 冲突的惩罚
@@ -282,7 +282,7 @@ class WarehouseEnvironment:
                 done = False
                 self.target_position = self.task_positions.pop(0)
 
-        self.get_earliest_item()
+            self.get_earliest_item()
 
         # 执行动作并更新环境状态
         self.agent_move(action, move_x_distance, move_y_distance)
@@ -308,7 +308,8 @@ class WarehouseEnvironment:
                 new_state = self.get_state()
                 reward += 1000
                 self.target_position = (0, 0)
-                self.task_positions.pop(0)
+                if len(self.task_positions) > 0:
+                    self.task_positions.pop(0)
                 return new_state, reward, done, {}  # 代理机器人到达目标位置，任务完成
 
             # # 如果任务列表是空，干涉物品也是空代表完成任务。
@@ -469,7 +470,8 @@ class WarehouseEnvironment:
         else:
             for item in self.interfering_items:
                 if interfering_item.item_id != item.item_id:
-                    self.interfering_items.append(interfering_item)
+                    tmp_interfering_item = copy.copy(interfering_item)
+                    self.interfering_items.append(tmp_interfering_item)
                     break
         self.remove_item(interfering_item)
         print("干扰物品位置： " + str(interfering_item.x), str(interfering_item.y))
@@ -633,8 +635,8 @@ class WarehouseEnvironment:
         rectangle2 = item2.get_rectangle()
         if not (rectangle1[2] + epsilon < rectangle2[0] or  # 左
                 rectangle1[0] - epsilon > rectangle2[2] or  # 右
-                rectangle1[3] + epsilon < rectangle2[1] or  # 上
-                rectangle1[1] - epsilon > rectangle2[3]):
+                rectangle1[3] - epsilon < rectangle2[1] or  # 上
+                rectangle1[1] + epsilon > rectangle2[3]):
             return True
         return False
 
