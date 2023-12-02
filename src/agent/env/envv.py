@@ -182,7 +182,7 @@ class WarehouseEnvironment:
     def get_earliest_item(self):
         if len(self.items) > 0 and self.target_position == (0, 0):
             # 获取最早出场时间的物品
-            earliest_item = min(self.items.values(), key=lambda x: datetime.strptime(x.exit_time, "%Y/%m/%d"))
+            earliest_item = min(list(self.items.values()), key=lambda x: datetime.strptime(x.exit_time, "%Y/%m/%d"))
             print("earliest_item: ", earliest_item.item_id, earliest_item.exit_time)
             print("current_time: ", self.current_time)
             if datetime.strptime(earliest_item.exit_time, "%Y/%m/%d") <= self.current_time:
@@ -243,8 +243,8 @@ class WarehouseEnvironment:
                     # 执行随机选择的处理方式
                     random_action(other_item)
 
-                    # self.handle_conflict_3(other_item)
-                    reward -= 5000  # 冲突的惩罚
+                    # self.handle_conflict_2(other_item)
+                    reward -= 2000  # 冲突的惩罚
         return reward
 
     def step(self, action):
@@ -424,10 +424,18 @@ class WarehouseEnvironment:
         if target_row is not None:
             # 移动干涉方块至相邻的上下行中
             self.move_to_target_row(interfering_item, target_row)
+            # 获取最后一个键（key）
+            last_key = list(self.items.keys())[-1]
+
+            # 获取最后一个物品
+            last_item = self.items[last_key]
+            self.item = last_item
+            self.items.pop(last_key)
+            self.agent = self.item
             self.task_positions.append((self.width, self.item.y))
             self.target_position = self.task_positions.pop(-1)
         else:
-            self.handle_conflict_3(interfering_item)
+            self.handle_conflict_1(interfering_item)
         # 待目标方块搬出后，不将这些干涉方块放回原所在行
 
     def handle_conflict_3(self, interfering_item):
@@ -454,16 +462,16 @@ class WarehouseEnvironment:
             self.item = last_item
             self.items.pop(last_key)
             self.agent = self.item
-            self.task_positions.append((self.width, self.item.y - target_row))
+            self.task_positions.append((self.width, self.item.y))
             self.target_position = self.task_positions.pop(-1)
 
     def move_to_target_row(self, item, target_row):
         self.remove_item(item)
         self.agent = self.item
         if self.agent.length - target_row < 0:
-            self.items.update({(self.item.x, self.item.y - target_row): item})
+            self.check_item(item.item_id, 0, item.y - target_row, item.length, item.width, item.start_time,item.processing_time, item.exit_time)
         else:
-            self.items.update({(self.item.x, self.item.y + target_row): item})
+            self.check_item(item.item_id, 0, item.y + target_row, item.length, item.width, item.start_time,item.processing_time, item.exit_time)
 
 
     def exchange_agent_item(self, interfering_item):
