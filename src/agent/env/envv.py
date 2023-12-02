@@ -339,6 +339,10 @@ class WarehouseEnvironment:
                 self.task_positions.append((self.width, self.agent.y))
                 self.target_position = self.task_positions.pop(-1)
                 done = False
+            elif self.agent_has_item is True and len(self.task_positions) == 0 and len(self.interfering_items) == 0:
+                self.task_positions.append((self.width, self.agent.y))
+                self.target_position = self.task_positions.pop(-1)
+                done = False
 
             if len(self.agent.item_id) < 10:
                 self.agent.item_id = 'agent_' + str(self.item.item_id)
@@ -424,14 +428,6 @@ class WarehouseEnvironment:
         if target_row is not None:
             # 移动干涉方块至相邻的上下行中
             self.move_to_target_row(interfering_item, target_row)
-            # 获取最后一个键（key）
-            last_key = list(self.items.keys())[-1]
-
-            # 获取最后一个物品
-            last_item = self.items[last_key]
-            self.item = last_item
-            self.items.pop(last_key)
-            self.agent = self.item
             self.task_positions.append((self.width, self.item.y))
             self.target_position = self.task_positions.pop(-1)
         else:
