@@ -222,7 +222,6 @@ class WarehouseEnvironment:
             self.item = self.getInitItem()
             self.agent = self.item
 
-
     def conflict_resolve(self, reward):
         # 在代理机器人移动过程中检测冲突
         print("代理机器人的状态： ", self.agent.item_id, self.agent.x, self.agent.y)
@@ -237,14 +236,14 @@ class WarehouseEnvironment:
                             'agent_') + "     " +
                         self.agent.item_id.strip('agent_'))
 
-                    # # # 随机选择一种处理方式
-                    # random_action = choice(
-                    #     [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
-                    #
-                    # # 执行随机选择的处理方式
-                    # random_action(other_item)
+                    # # 随机选择一种处理方式
+                    random_action = choice(
+                        [self.handle_conflict_1, self.handle_conflict_3])
 
-                    self.handle_conflict_1(other_item)
+                    # 执行随机选择的处理方式
+                    random_action(other_item)
+
+                    self.handle_conflict_3(other_item)
                     reward -= 5000  # 冲突的惩罚
         return reward
 
@@ -301,39 +300,29 @@ class WarehouseEnvironment:
         if self.agent_position == self.target_position:
             # 机器人是否到达了要添加干涉物品的位置，如果是 就添加
             self.arrive_interfering_position()
-            if len(self.interfering_items) == 0 and self.agent == self.item\
+            if len(self.interfering_items) == 0 and self.agent == self.item \
                     and self.agent_has_item is False and self.target_position != (0, 0):
                 print("---------------------------任务完成-------------------------")
                 done = True
                 new_state = self.get_state()
                 reward += 1000
                 self.target_position = (0, 0)
+                self.total_step_time = 0
+                self.total_step_time = round(self.total_step_time, 5)
+                # 记录每一步的信息
+                self.record_step(action, reward, done)
                 if len(self.task_positions) > 0:
                     self.task_positions.pop(0)
                 return new_state, reward, done, {}  # 代理机器人到达目标位置，任务完成
 
-            # # 如果任务列表是空，干涉物品也是空代表完成任务。
-            # if len(self.task_positions) == 0 and len(self.interfering_items) == 0\
-            #         and self.agent_has_item is False and self.agent is None\
-            #         and self.task_positions[-1] == (0, 0):
-            #     print("任务完成！")
-            #     reward += 1000
-            #     done = True  # 任务完成
-            #     return self.get_state(), reward, done, {}
-            # 代理机器人到达目标位置
             if self.target_position[0] < 75 and self.target_position != (0, 0):
                 # 拿到的物品是否为空，如果为空，代表需要从场地捡一个物品携带
-                if self.item_random is None and self.agent_has_item is False:
+                if self.agent_has_item is False:
                     item = self.items.get((self.target_position[0], self.target_position[1]))
                     self.item = item
                     self.agent = self.item
                     if self.remove_item(item):
                         self.agent_has_item = True
-                else:
-                    self.item = self.item_random
-                    self.remove_item(self.item_random)
-                    self.agent = self.item
-                    self.agent_has_item = True
 
             reward += 100  # 到达目标位置的奖励
             if self.target_position[0] >= 75:
@@ -343,7 +332,7 @@ class WarehouseEnvironment:
                 reward += 500  # 成功搬运物品的奖励
                 self.task_positions.append((0, 0))
                 self.target_position = self.task_positions.pop(-1)
-                self.item_random = None
+                # self.item_random = None
 
             # 如果机器人携带物品，并且任务位置列表是空，那就把目标位置设置为搬出
             elif self.agent_has_item is True and len(self.task_positions) != 0:
@@ -429,17 +418,19 @@ class WarehouseEnvironment:
         print("冲突解决2： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
 
         target_row = self.get_target_row(interfering_item)
-
-        self.task_positions.append((self.agent.x, self.agent.y))
-        flag = target_row - interfering_item.length
-        if flag > 0:
-            self.task_positions.append((interfering_item.x, interfering_item.y + target_row))
+        if target_row is None:
+            self.handle_conflict_3(interfering_item)
         else:
-            self.task_positions.append((interfering_item.x, interfering_item.y - target_row))
+            self.task_positions.append((self.agent.x, self.agent.y))
+            flag = target_row - interfering_item.length
+            if flag > 0:
+                self.task_positions.append((interfering_item.x, interfering_item.y + target_row))
+            else:
+                self.task_positions.append((interfering_item.x, interfering_item.y - target_row))
 
-        self.target_position = self.task_positions.pop(-1)
-        print("任务位置有： ")
-        print(self.task_positions)
+            self.target_position = self.task_positions.pop(-1)
+            print("任务位置有： ")
+            print(self.task_positions)
 
         # 待目标方块搬出后，不将这些干涉方块放回原所在行
 
@@ -452,10 +443,17 @@ class WarehouseEnvironment:
         print("冲突解决3： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
 
         target_row = self.get_target_row(interfering_item)
-        self.task_positions.append((interfering_item.x, interfering_item.y + target_row))
+
         if target_row is not None:
             # 移动干涉方块至相邻的上下行中
+            self.move_to_target_row(interfering_item, target_row)
+            self.task_positions.append((self.width, self.item.y + target_row))
             self.target_position = self.task_positions.pop(-1)
+
+    def move_to_target_row(self, item, target_row):
+        self.remove_item(item)
+        self.agent = self.item
+        self.items.update({(self.item.x, self.item.y + target_row): item})
 
     def exchange_agent_item(self, interfering_item):
         """
