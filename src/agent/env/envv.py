@@ -211,6 +211,10 @@ class WarehouseEnvironment:
     def arrive_interfering_position(self):
         if len(self.interfering_items) != 0 and self.agent_has_item is False and self.target_position == \
                 (self.interfering_items[-1].x, self.interfering_items[-1].y):
+            print("inter: " + str(len(self.interfering_items)))
+            print("inter_posi: " + str(self.interfering_items[-1].x) + str(self.interfering_items[-1].y))
+
+            print("target: " + str(self.target_position))
             item = self.interfering_items.pop(-1)
             print("干扰物品的是：", item.item_id)
             print("干扰物品的位置：", item.x, item.y)
@@ -218,9 +222,10 @@ class WarehouseEnvironment:
             self.check_item(item.item_id, 0, item.y, item.length, item.width, item.start_time,
                             item.processing_time,
                             item.exit_time)
-            self.agent_has_item = False
             self.item = self.getInitItem()
             self.agent = self.item
+            return True
+        return False
 
     def conflict_resolve(self, reward):
         # 在代理机器人移动过程中检测冲突
@@ -266,6 +271,7 @@ class WarehouseEnvironment:
         move_x_distance, move_y_distance = self.binary_forward()
         # 奖励初始化
         reward = 0
+        # -------------------分割线----------------------
 
         if self.target_position == (0, 0):
             if len(self.items) == 0 and len(self.cache_items) == 0:
@@ -286,6 +292,8 @@ class WarehouseEnvironment:
         # 执行动作并更新环境状态
         self.agent_move(action, move_x_distance, move_y_distance)
 
+        # -------------------分割线----------------------
+
         # 计算奖励
         if self.target_position != (0, 0) and self.target_position[0] < 75:
             x_distance_to_target = abs(self.agent.x - self.target_position[0])
@@ -297,66 +305,70 @@ class WarehouseEnvironment:
         if self.agent.y > self.target_position[1]:
             reward -= 100
 
+        # -------------------分割线----------------------
         if self.agent_position == self.target_position:
             # 机器人是否到达了要添加干涉物品的位置，如果是 就添加
-            self.arrive_interfering_position()
-            if len(self.interfering_items) == 0 and self.agent == self.item \
-                    and self.agent_has_item is False and self.target_position != (0, 0):
-                print("---------------------------任务完成-------------------------")
-                done = True
-                new_state = self.get_state()
-                reward += 1000
-                self.target_position = (0, 0)
-                self.total_step_time = 0
-                self.total_step_time = round(self.total_step_time, 5)
-                # 记录每一步的信息
-                self.record_step(action, reward, done)
-                if len(self.task_positions) > 0:
-                    self.task_positions.pop(0)
-                return new_state, reward, done, {}  # 代理机器人到达目标位置，任务完成
+            # self.arrive_interfering_position()
+            # if len(self.interfering_items) == 0 \
+            #         and self.agent_has_item is False and len(self.task_positions) == 0:
+            #     print("---------------------------任务完成-------------------------")
+            #     done = True
+            #     new_state = self.get_state()
+            #     reward += 1000
+            #     self.target_position = (0, 0)
+            #     self.total_step_time = 0
+            #     self.total_step_time = round(self.total_step_time, 5)
+            #     # 记录每一步的信息
+            #     self.record_step(action, reward, done)
+            #     if len(self.task_positions) > 0:
+            #         self.task_positions.pop(0)
+            #     return new_state, reward, done, {}  # 代理机器人到达目标位置，任务完成
 
-            if self.target_position[0] < 75 and self.target_position != (0, 0):
+            if self.target_position[0] < 75:
+                if self.arrive_interfering_position() is True:
+                    if len(self.task_positions) == 0 and \
+                            len(self.interfering_items) == 0:
+                        self.agent_has_item = False
+                        self.item = self.getInitItem()
+                        self.agent = self.item
+                        self.task_positions.append((0, 0))
+                        self.target_position = self.task_positions.pop(-1)
                 # 拿到的物品是否为空，如果为空，代表需要从场地捡一个物品携带
-                if self.agent_has_item is False:
+                if self.agent_has_item is False and self.arrive_interfering_position() is False and self.target_position != (0, 0):
                     item = self.items.get((self.target_position[0], self.target_position[1]))
                     self.item = item
                     self.agent = self.item
                     if self.remove_item(item):
                         self.agent_has_item = True
+                    self.task_positions.append((self.width, item.y))
+                    self.target_position = self.task_positions.pop(-1)
 
-            reward += 100  # 到达目标位置的奖励
-            if self.target_position[0] >= 75:
+
+            reward += 500  # 到达目标位置的奖励
+            if self.agent_position[0] >= 75:
                 self.item = self.getInitItem()
                 self.agent = self.item
                 self.agent_has_item = False
-                reward += 500  # 成功搬运物品的奖励
-                self.task_positions.append((0, 0))
+                reward += 800  # 成功搬运物品的奖励
+                if len(self.interfering_items) == 0 and len(self.task_positions) == 0:
+                    self.task_positions.append((0, 0))
                 self.target_position = self.task_positions.pop(-1)
-                # self.item_random = None
 
-            # 如果机器人携带物品，并且任务位置列表是空，那就把目标位置设置为搬出
-            elif self.agent_has_item is True and len(self.task_positions) != 0:
-                self.task_positions.append((self.width, self.agent.y))
-                self.target_position = self.task_positions.pop(-1)
-                done = False
-            elif self.agent_has_item is True and len(self.task_positions) == 0 and len(self.interfering_items) == 0:
-                self.task_positions.append((self.width, self.agent.y))
-                self.target_position = self.task_positions.pop(-1)
-                done = False
+            #
+            # # 如果机器人携带物品，并且任务位置列表是空，那就把目标位置设置为搬出
+            # elif self.agent_has_item is True and len(self.task_positions) != 0:
+            #     self.task_positions.append((self.width, self.agent.y))
+            #     self.target_position = self.task_positions.pop(-1)
+            #     done = False
+            # elif self.agent_has_item is True and len(self.task_positions) == 0 and len(self.interfering_items) == 0:
+            #     self.task_positions.append((self.width, self.agent.y))
+            #     self.target_position = self.task_positions.pop(-1)
+            #     done = False
 
             if len(self.agent.item_id) < 10:
                 self.agent.item_id = 'agent_' + str(self.item.item_id)
             self.agent.color = 'red'
-            # 如果机器人携带物品，但是任务位置列表不空，目标位置为任务列表最后一个。机器人放下携带物品，并初始化。
-            # 并且把携带物品加到环境中
-            # elif self.agent_has_item is True and len(self.task_positions) != 1:
-            #     self.prev_target_position = self.target_position
-            #     self.target_position = self.task_positions.pop(-1)
-            #     self.agent_has_item = False
-            #     self.items.update({(self.agent.x, self.agent.y): self.agent})
-            #     self.item = self.getInitItem()
-            #     self.agent = self.item
-            #     done = False
+
         else:
             done = False
 
@@ -371,11 +383,7 @@ class WarehouseEnvironment:
                 and self.agent.y == self.target_position[1]:
             self.target_position = self.task_positions.pop(-1)
 
-
-
-        # 更新环境
-        if self.target_position == (0, 0):
-            reward = 0
+        # -------------------分割线----------------------
 
         self.simulate_time_passage()
         # 更新状态
@@ -383,6 +391,19 @@ class WarehouseEnvironment:
         self.clean_on_road()
 
         self.render()  # 更新环境
+        # 更新环境
+        if self.target_position == (0, 0):
+            reward = 0
+            print("---------------------------任务完成-------------------------")
+            done = True
+            new_state = self.get_state()
+            reward += 1000
+            # self.target_position = (0, 0)
+            self.total_step_time = 0
+            self.total_step_time = round(self.total_step_time, 5)
+            # 记录每一步的信息
+            self.record_step(action, reward, done)
+            return new_state, reward, done, {}  # 代理机器人到达目标位置，任务完成
 
         self.total_reward += reward
         self.total_step_time += (datetime.now() - step_time).total_seconds()
@@ -440,7 +461,6 @@ class WarehouseEnvironment:
         """
         self.items.update({(self.agent.x, self.agent.y): self.agent})
 
-
         self.agent.color = 'red'
         print("冲突解决3： 现在的agent携带的物品是  " + self.agent.item_id.strip('agent_'))
         print("冲突解决3： 现在的Item携带的物品是  " + self.item.item_id.strip('agent_'))
@@ -460,21 +480,27 @@ class WarehouseEnvironment:
             self.agent = self.item
             self.task_positions.append((self.width, self.item.y))
             self.target_position = self.task_positions.pop(-1)
+        else:
+            self.handle_conflict_1(interfering_item)
 
     def move_to_target_row(self, item, target_row):
         self.remove_item(item)
         self.agent = self.item
         if self.agent.length - target_row < 0:
-            self.check_item(item.item_id, 0, item.y - target_row, item.length, item.width, item.start_time,item.processing_time, item.exit_time)
+            print("move: ----")
+            self.check_item(item.item_id, 0, item.y - target_row, item.length, item.width, item.start_time,
+                            item.processing_time, item.exit_time)
         else:
-            self.check_item(item.item_id, 0, item.y + target_row, item.length, item.width, item.start_time,item.processing_time, item.exit_time)
-
+            print("move: ++++")
+            self.check_item(item.item_id, 0, item.y + target_row, item.length, item.width, item.start_time,
+                            item.processing_time, item.exit_time)
 
     def exchange_agent_item(self, interfering_item):
         """
         交换agent和interfering_item
         """
         self.task_positions.append((interfering_item.x, interfering_item.y))
+        self.task_positions.append((self.agent.x, self.agent.y))
         self.agent.item_id = self.agent.item_id.strip('agent_')
         self.items.update({(self.agent.x, self.agent.y): self.agent})
         if len(self.interfering_items) == 0:
@@ -512,13 +538,13 @@ class WarehouseEnvironment:
         index = self.segment_heights.index(length)
         upper_row = self.segment_heights[index - 1]
         print("upper_row: " + str(upper_row))
-        if not self.is_conflict_with_target(upper_row, current_item) and upper_row >= length:
+        if not self.is_conflict_with_target(upper_row, current_item) and upper_row >= length and upper_row - length < 2:
             return upper_row
 
         # 检查移动到下面的行是否会发生冲突
         lower_row = self.segment_heights[index + 1]
         print("lower_row: " + str(lower_row))
-        if not self.is_conflict_with_target(lower_row, current_item) and lower_row >= length:
+        if not self.is_conflict_with_target(lower_row, current_item) and lower_row >= length and lower_row - length < 2:
             return lower_row
 
         # 如果上面和下面的行都会发生冲突，则返回 None 表示没有可用行
@@ -630,7 +656,7 @@ class WarehouseEnvironment:
         """
         items_com = []
         for (k, v) in self.items.items():
-            if k[1] == y:
+            if k[1] == y or k[1] == y + 1 or k[1] == y - 1:
                 items_com.append(v)
         return items_com
 

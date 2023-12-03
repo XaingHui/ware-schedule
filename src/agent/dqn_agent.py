@@ -136,7 +136,7 @@ def main():
     action_size = 4  # 代表上移、下移和不执行动作
     agent = DQNAgent(state_size, action_size)
 
-    episodes = 10000
+    episodes = 1000000
 
     for episode in range(episodes):
         state = env.get_state()  # Get the initial state
