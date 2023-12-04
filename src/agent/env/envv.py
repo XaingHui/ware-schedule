@@ -336,7 +336,7 @@ class WarehouseEnvironment:
                         self.target_position = self.task_positions.pop(-1)
                 # 拿到的物品是否为空，如果为空，代表需要从场地捡一个物品携带
                 if self.agent_has_item is False and self.arrive_interfering_position() is False and self.target_position != (
-                        0, 0):
+                        0, 0) and self.agent_position != (0, 0):
                     item = self.items.get((self.target_position[0], self.target_position[1]))
                     self.item = item
                     self.agent = self.item
@@ -432,10 +432,6 @@ class WarehouseEnvironment:
         path = base_filename
 
         # Check if the file with today's date already exists
-        if os.path.exists(path):
-            counter = int(path.strip('.csv').split('_')[-1])
-            counter += 1
-            path = f"{current_date}_simulation_records_{counter}.csv"
 
         with open(path, mode='w', newline='') as file:
             fieldnames = ['action', 'agent_position', 'target_position', 'total_reward', 'elapsed_time',
@@ -697,10 +693,10 @@ class WarehouseEnvironment:
         """
         rectangle1 = item1.get_rectangle()
         rectangle2 = item2.get_rectangle()
-        if not (rectangle1[2] + epsilon < rectangle2[0] or  # 左
-                rectangle1[0] - epsilon > rectangle2[2] or  # 右
-                rectangle1[3] - epsilon < rectangle2[1] or  # 上
-                rectangle1[1] + epsilon > rectangle2[3]):
+        if not (rectangle1[2] < rectangle2[0] or  # 左
+                rectangle1[0] > rectangle2[2] or  # 右
+                rectangle1[3] < rectangle2[1] or  # 上
+                rectangle1[1] > rectangle2[3]):
             return True
         return False
 
@@ -772,7 +768,7 @@ class WarehouseEnvironment:
                 return item
 
     def getInitItem(self):
-        init_item = Item('agent', self.agent.x, self.agent.y, 5, 5, '2017/9/1', 0, '2017/9/1', 'black')
+        init_item = Item('agent', 0, 0, 5, 5, '2017/9/1', 0, '2017/9/1', 'black')
         return init_item
 
 
