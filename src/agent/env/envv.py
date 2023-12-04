@@ -272,6 +272,7 @@ class WarehouseEnvironment:
         # 奖励初始化
         reward = 0
         # -------------------分割线----------------------
+        self.fix()
 
         if self.target_position == (0, 0):
             if len(self.items) == 0 and len(self.cache_items) == 0:
@@ -414,6 +415,11 @@ class WarehouseEnvironment:
         self.total_step_time = round(self.total_step_time, 5)
         self.record_step(action, reward, done)
         return new_state, reward, done, {}
+
+    def fix(self):
+        if self.target_position == (0, 0) and len(self.agent.item_id) == 10 and self.agent_has_item is Fasle:
+            self.agent_has_item = True
+            self.target_position = (self.width, self.agent.y)
 
     def save_records_to_csv(self):
         current_date = datetime.now().strftime("%Y-%m-%d")
