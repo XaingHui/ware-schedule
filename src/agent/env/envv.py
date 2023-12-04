@@ -1,6 +1,7 @@
 import copy
 import csv
 import operator
+import os
 import time
 from random import choice
 
@@ -208,13 +209,12 @@ class WarehouseEnvironment:
             self.task_positions.append((self.item.x, self.item.y))
             self.target_position = self.task_positions.pop(-1)
 
+    def set_current_time(self, new_time):
+        self.current_time = new_time
+
     def arrive_interfering_position(self):
         if len(self.interfering_items) != 0 and self.agent_has_item is False and self.target_position == \
                 (self.interfering_items[-1].x, self.interfering_items[-1].y):
-            print("inter: " + str(len(self.interfering_items)))
-            print("inter_posi: " + str(self.interfering_items[-1].x) + str(self.interfering_items[-1].y))
-
-            print("target: " + str(self.target_position))
             item = self.interfering_items.pop(-1)
             print("干扰物品的是：", item.item_id)
             print("干扰物品的位置：", item.x, item.y)
@@ -334,7 +334,8 @@ class WarehouseEnvironment:
                         self.task_positions.append((0, 0))
                         self.target_position = self.task_positions.pop(-1)
                 # 拿到的物品是否为空，如果为空，代表需要从场地捡一个物品携带
-                if self.agent_has_item is False and self.arrive_interfering_position() is False and self.target_position != (0, 0):
+                if self.agent_has_item is False and self.arrive_interfering_position() is False and self.target_position != (
+                        0, 0):
                     item = self.items.get((self.target_position[0], self.target_position[1]))
                     self.item = item
                     self.agent = self.item
@@ -342,7 +343,6 @@ class WarehouseEnvironment:
                         self.agent_has_item = True
                     self.task_positions.append((self.width, item.y))
                     self.target_position = self.task_positions.pop(-1)
-
 
             reward += 500  # 到达目标位置的奖励
             if self.agent_position[0] >= 75:
@@ -364,7 +364,8 @@ class WarehouseEnvironment:
             #     self.task_positions.append((self.width, self.agent.y))
             #     self.target_position = self.task_positions.pop(-1)
             #     done = False
-
+            if len(self.agent.item_id) == 11:
+                self.agent.item_id = 'agent'
             if len(self.agent.item_id) < 10:
                 self.agent.item_id = 'agent_' + str(self.item.item_id)
             self.agent.color = 'red'
@@ -392,7 +393,8 @@ class WarehouseEnvironment:
 
         self.render()  # 更新环境
         # 更新环境
-        if self.target_position == (0, 0):
+        if self.target_position == (0, 0) and len(self.task_positions) == 0 \
+                and len(self.interfering_items) == 0:
             reward = 0
             print("---------------------------任务完成-------------------------")
             done = True
@@ -403,6 +405,8 @@ class WarehouseEnvironment:
             self.total_step_time = round(self.total_step_time, 5)
             # 记录每一步的信息
             self.record_step(action, reward, done)
+            earliest_item = min(list(self.items.values()), key=lambda x: datetime.strptime(x.exit_time, "%Y/%m/%d"))
+            self.set_current_time(datetime.strptime(earliest_item.exit_time, "%Y/%m/%d"))
             return new_state, reward, done, {}  # 代理机器人到达目标位置，任务完成
 
         self.total_reward += reward
@@ -412,7 +416,18 @@ class WarehouseEnvironment:
         return new_state, reward, done, {}
 
     def save_records_to_csv(self):
-        with open('simulation_records.csv', mode='w', newline='') as file:
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        base_filename = f"{current_date}_simulation_records_1.csv"
+
+        path = base_filename
+        counter = 1
+
+        # Check if the file with today's date already exists
+        while os.path.exists(path):
+            counter += 1
+            path = f"{current_date}_simulation_records_{counter}.csv"
+
+        with open(path, mode='w', newline='') as file:
             fieldnames = ['action', 'agent_position', 'target_position', 'total_reward', 'elapsed_time',
                           'conflict_count']
             writer = csv.DictWriter(file, fieldnames=fieldnames)
@@ -487,11 +502,9 @@ class WarehouseEnvironment:
         self.remove_item(item)
         self.agent = self.item
         if self.agent.length - target_row < 0:
-            print("move: ----")
             self.check_item(item.item_id, 0, item.y - target_row, item.length, item.width, item.start_time,
                             item.processing_time, item.exit_time)
         else:
-            print("move: ++++")
             self.check_item(item.item_id, 0, item.y + target_row, item.length, item.width, item.start_time,
                             item.processing_time, item.exit_time)
 
