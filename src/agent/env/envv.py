@@ -327,11 +327,11 @@ class WarehouseEnvironment:
 
             if self.target_position[0] < 75:
                 if self.arrive_interfering_position() is True:
+                    self.agent_has_item = False
+                    self.item = self.getInitItem()
+                    self.agent = self.item
                     if len(self.task_positions) == 0 and \
                             len(self.interfering_items) == 0:
-                        self.agent_has_item = False
-                        self.item = self.getInitItem()
-                        self.agent = self.item
                         self.task_positions.append((0, 0))
                         self.target_position = self.task_positions.pop(-1)
                 # 拿到的物品是否为空，如果为空，代表需要从场地捡一个物品携带
@@ -417,8 +417,12 @@ class WarehouseEnvironment:
         return new_state, reward, done, {}
 
     def fix(self):
-        if self.target_position == (0, 0) and len(self.agent.item_id) == 10 and self.agent_has_item is Fasle:
+        if self.target_position == (0, 0) and len(self.agent.item_id) == 10 and self.agent_has_item is False:
+            item = self.items.get((self.target_position[0], self.target_position[1]))
+            self.item = item
+            self.agent = self.item
             self.agent_has_item = True
+            self.remove_item(item)
             self.target_position = (self.width, self.agent.y)
 
     def save_records_to_csv(self):
