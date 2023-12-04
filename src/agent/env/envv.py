@@ -420,10 +420,10 @@ class WarehouseEnvironment:
         base_filename = f"{current_date}_simulation_records_1.csv"
 
         path = base_filename
-        counter = 1
 
         # Check if the file with today's date already exists
-        while os.path.exists(path):
+        if os.path.exists(path):
+            counter = int(path.strip('.csv').split('_')[-1])
             counter += 1
             path = f"{current_date}_simulation_records_{counter}.csv"
 
