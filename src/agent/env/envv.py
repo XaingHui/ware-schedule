@@ -212,9 +212,8 @@ class WarehouseEnvironment:
     def set_current_time(self, new_time):
         self.current_time = new_time
 
-    def arrive_interfering_position(self):
-        if len(self.interfering_items) != 0 and self.agent_has_item is False and self.target_position == \
-                (self.interfering_items[-1].x, self.interfering_items[-1].y):
+    def add_interfering_item(self):
+        if self.arrive_interfering_position():
             item = self.interfering_items.pop(-1)
             print("干扰物品的是：", item.item_id)
             print("干扰物品的位置：", item.x, item.y)
@@ -224,6 +223,10 @@ class WarehouseEnvironment:
                             item.exit_time)
             self.item = self.getInitItem()
             self.agent = self.item
+
+    def arrive_interfering_position(self):
+        if len(self.interfering_items) != 0 and self.agent_has_item is False and self.target_position == \
+                (self.interfering_items[-1].x, self.interfering_items[-1].y):
             return True
         return False
 
@@ -240,7 +243,6 @@ class WarehouseEnvironment:
                         f"冲突发生：代理机器人携带的物品与其他物品冲突  " + other_item.item_id.strip(
                             'agent_') + "     " +
                         self.agent.item_id.strip('agent_'))
-
                     # 随机选择一种处理方式
                     random_action = choice(
                         [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
@@ -249,8 +251,52 @@ class WarehouseEnvironment:
                     random_action(other_item)
 
                     # self.handle_conflict_2(other_item)
-                    reward -= 2000  # 冲突的惩罚
+                    reward -= 3000
+
         return reward
+
+    def is_one(self):
+        try:
+            if self.arrive_interfering_position():
+                self.add_interfering_item()
+                self.agent_has_item = False
+                self.item = self.getInitItem()
+                self.agent = self.item
+                if not self.task_positions and not self.interfering_items:
+                    self.task_positions.append((0, 0))
+                    self.target_position = self.task_positions.pop(-1)
+                else:
+                    self.target_position = self.task_positions.pop(-1)
+        except Exception as e:
+            print(f"An error occurred in is_one: {e}")
+            print("任务列表:", self.task_positions)
+            print("self.agent；", self.agent.item_id, self.agent.x, self.agent.y)
+            print("self.item: ", self.item.item_id, self.item.x, self.item.y)
+            self.task_positions = []  # 清空任务列表
+
+    def is_two(self):
+        try:
+            # 拿到的物品是否为空，如果为空，代表需要从场地捡一个物品携带
+            if not self.agent_has_item and not self.arrive_interfering_position() and self.target_position != (
+                    0, 0) and self.agent_position != (0, 0):
+                item = self.items.get((self.target_position[0], self.target_position[1]))
+                if item is None:
+                    # 处理 item 为 None 的情况
+                    print("------------------------item 为空--------------------")
+                    # self.target_position = (0, 0)
+                else:
+                    self.item = item
+                    self.agent = self.item
+                    if self.remove_item(item):
+                        self.agent_has_item = True
+                    self.task_positions.append((self.width, item.y))
+                    self.target_position = self.task_positions.pop(-1)
+        except Exception as e:
+            print(f"An error occurred in is_two: {e}")
+            print("任务列表:", self.task_positions)
+            print("self.agent；", self.agent.item_id, self.agent.x, self.agent.y)
+            print("self.item: ", self.item.item_id, self.item.x, self.item.y)
+            print("item: ", item)
 
     def step(self, action):
         print("---------------------------------------------------------------")
@@ -308,42 +354,9 @@ class WarehouseEnvironment:
 
         # -------------------分割线----------------------
         if self.agent_position == self.target_position:
-            # 机器人是否到达了要添加干涉物品的位置，如果是 就添加
-            # self.arrive_interfering_position()
-            # if len(self.interfering_items) == 0 \
-            #         and self.agent_has_item is False and len(self.task_positions) == 0:
-            #     print("---------------------------任务完成-------------------------")
-            #     done = True
-            #     new_state = self.get_state()
-            #     reward += 1000
-            #     self.target_position = (0, 0)
-            #     self.total_step_time = 0
-            #     self.total_step_time = round(self.total_step_time, 5)
-            #     # 记录每一步的信息
-            #     self.record_step(action, reward, done)
-            #     if len(self.task_positions) > 0:
-            #         self.task_positions.pop(0)
-            #     return new_state, reward, done, {}  # 代理机器人到达目标位置，任务完成
-
             if self.target_position[0] < 75:
-                if self.arrive_interfering_position() is True:
-                    self.agent_has_item = False
-                    self.item = self.getInitItem()
-                    self.agent = self.item
-                    if len(self.task_positions) == 0 and \
-                            len(self.interfering_items) == 0:
-                        self.task_positions.append((0, 0))
-                        self.target_position = self.task_positions.pop(-1)
-                # 拿到的物品是否为空，如果为空，代表需要从场地捡一个物品携带
-                if self.agent_has_item is False and self.arrive_interfering_position() is False and self.target_position != (
-                        0, 0) and self.agent_position != (0, 0):
-                    item = self.items.get((self.target_position[0], self.target_position[1]))
-                    self.item = item
-                    self.agent = self.item
-                    if self.remove_item(item):
-                        self.agent_has_item = True
-                    self.task_positions.append((self.width, item.y))
-                    self.target_position = self.task_positions.pop(-1)
+                self.is_one()
+                self.is_two()
 
             reward += 500  # 到达目标位置的奖励
             if self.agent_position[0] >= 75:
@@ -353,21 +366,12 @@ class WarehouseEnvironment:
                 reward += 800  # 成功搬运物品的奖励
                 if len(self.interfering_items) == 0 and len(self.task_positions) == 0:
                     self.task_positions.append((0, 0))
-                self.target_position = self.task_positions.pop(-1)
+                else:
+                    self.target_position = self.task_positions.pop(-1)
 
-            #
-            # # 如果机器人携带物品，并且任务位置列表是空，那就把目标位置设置为搬出
-            # elif self.agent_has_item is True and len(self.task_positions) != 0:
-            #     self.task_positions.append((self.width, self.agent.y))
-            #     self.target_position = self.task_positions.pop(-1)
-            #     done = False
-            # elif self.agent_has_item is True and len(self.task_positions) == 0 and len(self.interfering_items) == 0:
-            #     self.task_positions.append((self.width, self.agent.y))
-            #     self.target_position = self.task_positions.pop(-1)
-            #     done = False
             if len(self.agent.item_id) == 11:
                 self.agent.item_id = 'agent'
-            if len(self.agent.item_id) < 10:
+            if len(self.agent.item_id) <= 10:
                 self.agent.item_id = 'agent_' + str(self.item.item_id)
             self.agent.color = 'red'
 
@@ -407,6 +411,10 @@ class WarehouseEnvironment:
             # 记录每一步的信息
             self.record_step(action, reward, done)
             earliest_item = min(list(self.items.values()), key=lambda x: datetime.strptime(x.exit_time, "%Y/%m/%d"))
+            # if datetime.strptime(earliest_item.exit_time, "%Y/%m/%d") == \
+            #         datetime.strptime(str(datetime.strptime(self.current_time, "%Y/%m/%d")), "%Y/%m/%d"):
+            #     pass
+            # else:
             self.set_current_time(datetime.strptime(earliest_item.exit_time, "%Y/%m/%d"))
             return new_state, reward, done, {}  # 代理机器人到达目标位置，任务完成
 
@@ -427,7 +435,7 @@ class WarehouseEnvironment:
 
     def save_records_to_csv(self):
         current_date = datetime.now().strftime("%Y-%m-%d")
-        base_filename = f"{current_date}_simulation_records_1.csv"
+        base_filename = f"{current_date}_simulation_records.csv"
 
         path = base_filename
 
@@ -557,13 +565,15 @@ class WarehouseEnvironment:
         index = self.segment_heights.index(length)
         upper_row = self.segment_heights[index - 1]
         print("upper_row: " + str(upper_row))
-        if not self.is_conflict_with_target(upper_row, current_item) and upper_row >= length and upper_row - length < 2:
+        if not self.is_conflict_with_target(upper_row, current_item) and upper_row >= length and upper_row - length < 2 and \
+                upper_row != 8:
             return upper_row
 
         # 检查移动到下面的行是否会发生冲突
         lower_row = self.segment_heights[index + 1]
         print("lower_row: " + str(lower_row))
-        if not self.is_conflict_with_target(lower_row, current_item) and lower_row >= length and lower_row - length < 2:
+        if not self.is_conflict_with_target(lower_row, current_item) and lower_row >= length and lower_row - length < 2 and \
+                lower_row != 8:
             return lower_row
 
         # 如果上面和下面的行都会发生冲突，则返回 None 表示没有可用行
@@ -693,12 +703,18 @@ class WarehouseEnvironment:
         """
         rectangle1 = item1.get_rectangle()
         rectangle2 = item2.get_rectangle()
-        if not (rectangle1[2] < rectangle2[0] or  # 左
-                rectangle1[0] > rectangle2[2] or  # 右
-                rectangle1[3] < rectangle2[1] or  # 上
-                rectangle1[1] > rectangle2[3]):
-            return True
-        return False
+        # if not (rectangle1[2] < rectangle2[0] or  # 左
+        #         rectangle1[0] > rectangle2[2] or  # 右
+        #         rectangle1[3] < rectangle2[1] or  # 上
+        #         rectangle1[1] > rectangle2[3]):
+        #     return True
+        # return False
+        return (
+                rectangle1[0] < rectangle2[2] and
+                rectangle1[2] > rectangle2[0] and
+                rectangle1[1] < rectangle2[3] and
+                rectangle1[3] > rectangle2[1]
+        )
 
     def clean_on_road(self):
         """
