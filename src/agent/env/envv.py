@@ -244,6 +244,7 @@ class WarehouseEnvironment:
                             'agent_') + "     " +
                         self.agent.item_id.strip('agent_'))
                     # 随机选择一种处理方式
+                    tag_conflict = self.conflict_count
                     random_action = choice(
                         [self.handle_conflict_1, self.handle_conflict_2, self.handle_conflict_3])
 
@@ -251,7 +252,7 @@ class WarehouseEnvironment:
                     random_action(other_item)
 
                     # self.handle_conflict_2(other_item)
-                    reward -= 3000
+                    reward -= 3000 * (self.conflict_count - tag_conflict)
 
         return reward
 
@@ -410,12 +411,15 @@ class WarehouseEnvironment:
             self.total_step_time = round(self.total_step_time, 5)
             # 记录每一步的信息
             self.record_step(action, reward, done)
-            earliest_item = min(list(self.items.values()), key=lambda x: datetime.strptime(x.exit_time, "%Y/%m/%d"))
+            if not list(self.items.values()):
+                pass
+            else:
+                earliest_item = min(list(self.items.values()), key=lambda x: datetime.strptime(x.exit_time, "%Y/%m/%d"))
             # if datetime.strptime(earliest_item.exit_time, "%Y/%m/%d") == \
             #         datetime.strptime(str(datetime.strptime(self.current_time, "%Y/%m/%d")), "%Y/%m/%d"):
             #     pass
             # else:
-            self.set_current_time(datetime.strptime(earliest_item.exit_time, "%Y/%m/%d"))
+                self.set_current_time(datetime.strptime(earliest_item.exit_time, "%Y/%m/%d"))
             return new_state, reward, done, {}  # 代理机器人到达目标位置，任务完成
 
         self.total_reward += reward
@@ -711,9 +715,9 @@ class WarehouseEnvironment:
         # return False
         return (
                 rectangle1[0] < rectangle2[2] and
-                rectangle1[2] > rectangle2[0] and
+                rectangle1[2] >= rectangle2[0] and
                 rectangle1[1] < rectangle2[3] and
-                rectangle1[3] > rectangle2[1]
+                rectangle1[3] >= rectangle2[1]
         )
 
     def clean_on_road(self):
